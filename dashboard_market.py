@@ -4,14 +4,13 @@ import numpy as np
 import pandas as pd
 from dateutil import tz
 from datetime import datetime, timedelta, timezone
-from mt5_trade import Mt5Trade, Columns, PositionInfo
-
+import threading
 import streamlit as st
 
+from mt5_trade import Mt5Trade, Columns, PositionInfo
 from time_utils import TimeUtils
 from data_buffer import DataBuffer
 from candle_chart import CandleChart
-
 
 JST = tz.gettz('Asia/Tokyo')
 UTC = tz.gettz('utc')  
@@ -22,15 +21,17 @@ TIMEFRAMES = ['M5', 'M15', 'M30', 'H1', 'H4', 'D1']
 
 def calc_indicators(timeframe, data, technical_params):
     pass
-    
 
 class Mt5Manager:
     def __init__(self, symbol, timeframe):
         self.set_sever_time()
         self.mt5 = Mt5Trade(symbol)
-        self.mt5.connect()
+        
         self.symbol = symbol
         self.timeframe = timeframe
+        
+    def connect(self):
+        self.mt5.connect()
     
     def utcnow(self):
         #utc1 = datetime.utcnow()
@@ -73,6 +74,27 @@ class Mt5Manager:
         self.buffer = buffer
         return buffer.data
 
+
+class DataLoader(threading.Thread):
+    def __init__(self, symbol, timeframe, length, **kwargs):
+        super().__init__(**kwargs)
+        self.data = None
+        self.symbol = symbol
+        self.timeframe = timeframe
+        self.length = length
+    
+    def get_price(self):
+        mt5 = Mt5Manager(self.symbol, self.timeframe)
+        mt5.connect()
+        return mt5.init(self.length, calc_indicators, {})
+    
+    def run(self):
+        while True:
+            self.data = self.get_price()
+            time.sleep(0.5)
+
+
+
 class Dashboard:
     
     def __init__(self, title):
@@ -81,24 +103,14 @@ class Dashboard:
             layout="wide",
         )    
         self.build_sidebar()
-        
+        self.placeholder = st.empty()
+        self.loop = False
         
     def build_sidebar(self):
         self.symbol = st.sidebar.selectbox('Symbol', SYMBOLS)
         self.timeframe = st.sidebar.selectbox('Timeframe', TIMEFRAMES)
         self.length = st.sidebar.selectbox('Length', range(50, 500, 50))
         
-        
-    def run(self):
-        if self.symbol != "":
-            data = self.get_price(self.symbol, self.timeframe, self.length)
-            fig = self.create_fig(data)
-            st.bokeh_chart(fig)
-
-    def get_price(self, symbol, timeframe, length):
-        mt5 = Mt5Manager(symbol, timeframe)
-        return mt5.init(length, calc_indicators, {})
-
     def create_fig(self, data):
         time = data[Columns.JST]
         op = data[Columns.OPEN]
@@ -107,7 +119,21 @@ class Dashboard:
         cl = data[Columns.CLOSE]
         chart = CandleChart(f'{self.symbol} {self.timeframe}', 1000, 400, time, op, hi, lo, cl)
         return chart.fig
-                
+                            
+    def run(self):
+        if self.symbol != "":
+            if "DataLoader" not in st.session_state:
+                st.session_state.DataLoader = DataLoader(self.symbol, self.timeframe, self.length)
+                st.session_state.DataLoader.start()
+            self.loop = True
+            
+        while self.loop:            
+            data = st.session_state.DataLoader.data
+            if data is not None:
+                fig = self.create_fig(data)
+                self.placeholder.bokeh_chart(fig)
+            time.sleep(0.5)
+ 
 def test():
     dashboard = Dashboard('NIKKEI')
     
