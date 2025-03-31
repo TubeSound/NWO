@@ -32,7 +32,11 @@ class TimeChart():
                             tooltips=TOOLTIPS,
                             title = title)
     
-        self.time = time
+        self.time = list(time)
+        dt = time[-1] - time[-2]
+        for i in range(1, 50):
+            time.append(time[-1] + i * dt)
+        
         self.fig.xaxis.major_label_overrides = {i: d.strftime(date_format) for i, d in enumerate(time)}
         self.indices = range(len(time))
 
@@ -77,10 +81,10 @@ class TimeChart():
 class CandleChart(TimeChart):
     def __init__(self, title, width, height, time, op, hi, lo, cl, date_format='%Y/%m/%d %H:%M'):
         super().__init__(title, width, height, time, date_format)
-        self.op = op
-        self.hi = hi
-        self.lo = lo
-        self.cl = cl
+        self.op = np.array(op)
+        self.hi = np.array(hi)
+        self.lo = np.array(lo)
+        self.cl = np.array(cl)
         self.plot_candle()
         
     def pickup(self, valid, arrays):
