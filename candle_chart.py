@@ -9,7 +9,7 @@ from bokeh.plotting import figure
 from bokeh.plotting import show
 from bokeh.plotting import output_notebook
 from bokeh.layouts import column, row, layout, gridplot
-from bokeh.models import Spacer, Span, Text
+from bokeh.models import Spacer, Span, Text, Range1d
 from bokeh.models import HoverTool, ColumnDataSource
 from bokeh.io import export_png
 from dateutil import tz
@@ -32,6 +32,8 @@ class TimeChart():
                             tooltips=TOOLTIPS,
                             title = title)
     
+        self.width = width
+        self.height = height
         self.time = list(time)
         dt = time[-1] - time[-2]
         for i in range(1, 50):
@@ -64,12 +66,15 @@ class TimeChart():
                 ys.append(v)
         self.fig.scatter(indices, np.array(ys), marker=marks[marker], color=color, size=size)
         
-    def vline(self, time, color, width=1):
-        index = self.time_index(time)
-        span = Span(location=index,
+    def vline(self, index, color):
+        if not isinstance(index, int):
+            index = self.time_index(index)
+        w = self.width / len(self.indices) * 2.1
+        span = Span(location=index - w / 2,
                     dimension='height',
                     line_color=color,
-                    line_width=width)
+                    line_alpha=0.1,
+                    line_width=w)
         self.fig.add_layout(span)
         
     def text(self, time, y, text, color):
@@ -79,14 +84,10 @@ class TimeChart():
         
         
 class CandleChart(TimeChart):
-    def __init__(self, title, width, height, time, op, hi, lo, cl, date_format='%Y/%m/%d %H:%M'):
+    def __init__(self, title, width, height, time, date_format='%Y/%m/%d %H:%M', yrange=None):
         super().__init__(title, width, height, time, date_format)
-        self.op = np.array(op)
-        self.hi = np.array(hi)
-        self.lo = np.array(lo)
-        self.cl = np.array(cl)
-        self.plot_candle()
-        
+        self.yrange = yrange
+
     def pickup(self, valid, arrays):
         out = []
         index = []
@@ -100,7 +101,19 @@ class CandleChart(TimeChart):
             out.append(np.array(d))
         return index, out
                     
-    def plot_candle(self):
+                    
+    def plot_background(self, array, colors):
+        for i , a in enumerate(array):
+            if a > 0:
+                self.vline(i, colors[0])
+            elif a < 0:
+                self.vline(i, colors[1])
+                    
+    def plot_candle(self, op, hi, lo, cl):
+        self.op = np.array(op)
+        self.hi = np.array(hi)
+        self.lo = np.array(lo)
+        self.cl = np.array(cl)
         ascend = self.cl > self.op
         descend = ~ascend
         self.fig.segment(self.indices, self.hi, self.indices, self.lo, color="black")
@@ -108,7 +121,22 @@ class CandleChart(TimeChart):
         self.fig.vbar(time, 0.5, values[0], values[1], fill_color="#44a144", line_color="gray")
         time, values = self.pickup(descend, [self.op, self.cl])        
         self.fig.vbar(time, 0.5, values[0], values[1], fill_color="#F23f3E", line_color="gray")
-       
+        self.min = np.nanmin(self.lo)
+        self.max = np.nanmax(self.hi)
+        if self.yrange is not None:
+            self.set_ylim(self.min, self.max, self.yrange)
+            
+    def set_ylim(self, min, max, yrange):
+        r = max - min
+        if r > yrange:
+            upper = max
+            lower = max - yrange
+        else:
+            center = np.mean([min, max])
+            upper = center + yrange / 2
+            lower = center - yrange / 2
+        self.fig.y_range =  Range1d(lower, upper)
+                        
 
 def from_pickle(file):
     import pickle

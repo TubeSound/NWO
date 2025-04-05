@@ -1582,17 +1582,17 @@ def rally(data, short_term=12, mid_term=24, long_term=48, threshold=0.1, rate=0.
     w2 = np.array(ma2) - np.array(ma3)
     r = np.abs(w1 / w2)
     
-    c1 = (w1 > 0) and (w2 > 0)
-    c2 = (d1 > threshold) and (d2 > threshold) and (d3 > threshold)
-    c3 = (r > (1.0 - rate)) and (r < (1.0 + rate))
+    c1 = (w1 > 0) & (w2 > 0)
+    c2 = (d1 > threshold) & (d2 > threshold) & (d3 > threshold)
+    c3 = (r > (1.0 - rate)) & (r < (1.0 + rate))
     
     sig = np.full(n, 0)
     for i in range(n):
         if c1[i] and c2[i] and c3[i]:
             sig[i] = 1
             
-    c1 = (w1 < 0) and (w2 < 0)
-    c2 = (d1 < threshold) and (d2 < threshold) and (d3 < threshold)
+    c1 = (w1 < 0) & (w2 < 0)
+    c2 = (d1 < threshold) & (d2 < threshold) & (d3 < threshold)
     for i in range(n):
         if c1[i] and c2[i] and c3[i]:
             sig[i] = -1   

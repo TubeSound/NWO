@@ -6,32 +6,37 @@ from dateutil import tz
 from datetime import datetime, timedelta, timezone
 import threading
 import streamlit as st
+import warnings
+
+warnings.simplefilter('ignore')
+
 
 from mt5_trade import Mt5Trade, Columns, PositionInfo
 from time_utils import TimeUtils
 from data_buffer import DataBuffer
 from candle_chart import CandleChart
+from technical import rally, SUPERTREND, SUPERTREND_SIGNAL
+from common import Indicators
 
 JST = tz.gettz('Asia/Tokyo')
 UTC = tz.gettz('utc')  
 
 SYMBOLS = ['', 'NIKKEI', 'DOW', 'NSDQ']
-TIMEFRAMES = ['M5', 'M15', 'M30', 'H1', 'H4', 'D1']
+TIMEFRAMES = ['M15', 'M30', 'H1', 'H4', 'D1']
 
+LENGTH_MARGIN = 400
 
 def calc_indicators(timeframe, data, technical_params):
-    pass
-
+    rally(data)
+    SUPERTREND(data, 10, 3.0)
+    SUPERTREND_SIGNAL(data, 10)
+    
 class Mt5Manager:
-    def __init__(self, symbol, timeframe):
+    def __init__(self, mt5, symbol, timeframe):
         self.set_sever_time()
-        self.mt5 = Mt5Trade(symbol)
-        
+        self.mt5 = mt5
         self.symbol = symbol
         self.timeframe = timeframe
-        
-    def connect(self):
-        self.mt5.connect()
     
     def utcnow(self):
         #utc1 = datetime.utcnow()
@@ -53,8 +58,46 @@ class Mt5Manager:
     def wait_market_open(self, mt5, timezone):
         while self.is_market_open(mt5, timezone) == False:
             time.sleep(5)
+        #print('SeverTime GMT+', dt, tz)
+        
+    def init(self, length, length_margin, technical_function, technical_param, remove_last=False):
+        df = self.mt5.get_rates(self.symbol, self.timeframe, length + length_margin)
+        if remove_last:
+            df = df.iloc[:-1, :]
+        buffer = DataBuffer(technical_function, self.symbol, self.timeframe, length, df, technical_param, self.delta_hour_from_gmt)
+        self.buffer = buffer
+        return buffer.data
+
+class DataLoader(threading.Thread):
+    def __init__(self, mt5, **kwargs):
+        super().__init__(**kwargs)
+        self.data = None
+        self.mt5 = mt5
     
-    def set_sever_time(self):
+    def get_price(self, remove_last=False):
+        out = {}
+        for symbol, dic in self.conditions.items():
+            d = {}
+            for timeframe, [indicator_function, param, length, length_margin] in dic.items():
+                df = self.mt5.get_rates(symbol, timeframe, length + length_margin)
+                if remove_last:
+                    df = df.iloc[:-1, :]
+                buffer = DataBuffer(symbol, timeframe, length, df, indicator_function, param, self.server_time_delta())
+                d[timeframe] = buffer.data
+                del df
+            out[symbol] = d
+        return out
+    
+    def run(self):
+        self.loop = True
+        while self.loop:
+            self.data = self.get_price()
+            time.sleep(0.5)
+        
+    def setup(self, conditions):
+        self.conditions = conditions
+        
+    def server_time_delta(self):
         begin_month = 3
         begin_sunday = 2
         end_month = 11
@@ -64,39 +107,9 @@ class Mt5Manager:
         dt, tz = TimeUtils.delta_hour_from_gmt(now, begin_month, begin_sunday, end_month, end_sunday, delta_hour_from_gmt_in_summer)
         self.delta_hour_from_gmt  = dt
         self.server_timezone = tz
-        print('SeverTime GMT+', dt, tz)
-        
-    def init(self, length, technical_function, technical_param, remove_last=False):
-        df = self.mt5.get_rates(self.timeframe, length)
-        if remove_last:
-            df = df.iloc[:-1, :]
-        buffer = DataBuffer(technical_function, self.symbol, self.timeframe, df, technical_param, self.delta_hour_from_gmt)
-        self.buffer = buffer
-        return buffer.data
-
-
-class DataLoader(threading.Thread):
-    def __init__(self, symbol, timeframe, length, **kwargs):
-        super().__init__(**kwargs)
-        self.data = None
-        self.symbol = symbol
-        self.timeframe = timeframe
-        self.length = length
-    
-    def get_price(self):
-        mt5 = Mt5Manager(self.symbol, self.timeframe)
-        mt5.connect()
-        return mt5.init(self.length, calc_indicators, {})
-    
-    def run(self):
-        while True:
-            self.data = self.get_price()
-            time.sleep(0.5)
-
-
+        return dt        
 
 class Dashboard:
-    
     def __init__(self, title):
         st.set_page_config(
             page_title=title,
@@ -105,11 +118,13 @@ class Dashboard:
         self.build_sidebar()
         self.placeholder = st.empty()
         self.loop = False
+        self.mt5 =  Mt5Trade()
+        self.mt5.connect()
         
     def build_sidebar(self):
         self.symbol = st.sidebar.selectbox('Symbol', SYMBOLS)
         self.timeframe = st.sidebar.selectbox('Timeframe', TIMEFRAMES)
-        self.length = st.sidebar.selectbox('Length', range(50, 500, 50))
+        self.length = st.sidebar.selectbox('Length', range(100, 500, 50))
         
     def create_fig(self, data):
         time = data[Columns.JST]
@@ -117,26 +132,37 @@ class Dashboard:
         hi = data[Columns.HIGH]
         lo = data[Columns.LOW]
         cl = data[Columns.CLOSE]
-        chart = CandleChart(f'{self.symbol} {self.timeframe}', 1000, 400, time, op, hi, lo, cl)
+        chart = CandleChart(f'{self.symbol} {self.timeframe}', 1000, 600, time)
+        chart.plot_background(data[Indicators.RALLY], ['green', 'red'])
+        chart.plot_candle(op, hi, lo, cl)
+        chart.line(data[Indicators.MA_SHORT], color='red', alpha=0.5)
+        chart.line(data[Indicators.MA_MID], color='green', alpha=0.5)
+        chart.line(data[Indicators.MA_LONG], color='blue', alpha=0.5)
+        chart.line(data[Indicators.SUPERTREND_U], color='green', alpha=0.4, line_width=4.0)
+        chart.line(data[Indicators.SUPERTREND_L], color='orange', alpha=0.4, line_width=4.0)
         return chart.fig
+    
                             
     def run(self):
         if self.symbol != "":
-            if "DataLoader" not in st.session_state:
-                st.session_state.DataLoader = DataLoader(self.symbol, self.timeframe, self.length)
+            if not "DataLoader" in st.session_state:
+                st.session_state.DataLoader = DataLoader(self.mt5)
                 st.session_state.DataLoader.start()
-            self.loop = True
-            
+            conditions = {self.symbol: {self.timeframe: [calc_indicators, {}, self.length, LENGTH_MARGIN]}}
+            st.session_state.DataLoader.setup(conditions)    
+            self.loop = True    
         while self.loop:            
-            data = st.session_state.DataLoader.data
-            if data is not None:
+            dic = st.session_state.DataLoader.data
+            try:
+                data = dic[self.symbol][self.timeframe]
                 fig = self.create_fig(data)
                 self.placeholder.bokeh_chart(fig)
+            except:
+                pass
             time.sleep(0.5)
  
 def test():
     dashboard = Dashboard('NIKKEI')
-    
     dashboard.run()
         
 if __name__ == '__main__':

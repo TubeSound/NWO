@@ -3,7 +3,7 @@ import numpy as np
 from mt5_trade import Mt5Trade, TimeFrame, Columns, nptimestamp2pydatetime
 from datetime import datetime, timedelta
 from common import Signal, Indicators
-
+from utils import Utils
 
 
 from dateutil import tz
@@ -85,16 +85,17 @@ def df2dic_one(df: pd.DataFrame, time_column: str, columns, utc_from: datetime, 
     return (n, dic)
 
 class DataBuffer:
-    def __init__(self, indicator_function, symbol: str, timeframe: str, df: pd.DataFrame, technical_params: dict, delta_hour_from_gmt):
+    def __init__(self, symbol: str, timeframe: str, length, df: pd.DataFrame, indicator_function, param, delta_hour_from_gmt):
         self.symbol = symbol
         self.timeframe = timeframe        
         self.delta_hour_from_gmt  =  delta_hour_from_gmt 
         n, data = df2dic(df, Columns.TIME, COLUMNS, None, self.delta_hour_from_gmt)
         if n == 0:
             raise Exception('Error cannot get initail data')
-        indicator_function(timeframe, data, technical_params)
+        indicator_function(timeframe, data, param)
+        data = Utils.sliceDictLast(data, length)
         self.data = data
-        self.technical_params = technical_params
+        self.param = param
         self.indicator_function = indicator_function
 
     def last_time(self):
@@ -122,7 +123,7 @@ class DataBuffer:
                         value += nans(n)
                 except:
                     print(value)
-        self.indicator_function(self.timeframe, self.data, self.technical_params)
+        self.function(self.timeframe, self.data, self.params)
         return n
                 
                 

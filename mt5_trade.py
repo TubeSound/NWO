@@ -151,9 +151,9 @@ class PositionInfo:
         return data, columns
     
 class Mt5Trade:
-    def __init__(self, symbol):
-        self.symbol = symbol
+    def __init__(self):
         self.ticket = None
+        self.symbol = None
         
     @staticmethod
     def connect():
@@ -161,6 +161,9 @@ class Mt5Trade:
             print('Connected to MT5 Version', mt5api.version())
         else:
             print('initialize() failed, error code = ', mt5api.last_error())
+            
+    def set_symbol(self, symbol):
+        self.symbol = symbol
         
     def parse_order_result(self, result, index: int, time: datetime, stoploss, takeprofit):
         if result is None:
@@ -314,12 +317,12 @@ class Mt5Trade:
         t_end = self.jst2utc(jst_end)
         return self.get_ticks(t_begin, t_end)
 
-    def get_ticks(self, utc_begin, utc_end):
-        ticks = mt5api.copy_ticks_range(self.symbol, utc_begin, utc_end, mt5api.COPY_TICKS_ALL)
+    def get_ticks(self, symbol, utc_begin, utc_end):
+        ticks = mt5api.copy_ticks_range(symbol, utc_begin, utc_end, mt5api.COPY_TICKS_ALL)
         return self.parse_ticks(ticks)    
     
-    def get_ticks_from(self, utc_time, length=10):
-        ticks = mt5api.copy_ticks_from(self.symbol, utc_time, length, mt5api.COPY_TICKS_ALL)
+    def get_ticks_from(self, symbol,  utc_time, length=10):
+        ticks = mt5api.copy_ticks_from(symbol, utc_time, length, mt5api.COPY_TICKS_ALL)
         return self.parse_ticks(ticks)
         
     def parse_ticks(self, ticks):
@@ -327,18 +330,18 @@ class Mt5Trade:
         df[Columns.TIME] = pd.to_datetime(df[Columns.TIME], unit='s')
         return df
     
-    def get_rates_jst(self, timeframe: TimeFrame, jst_begin, jst_end):
+    def get_rates_jst(self, symbol, timeframe: TimeFrame, jst_begin, jst_end):
         t_begin = self.jst2utc(jst_begin)
         t_end = self.jst2utc(jst_end)
-        return self.get_rates_utc(timeframe, t_begin, t_end)
+        return self.get_rates_utc(symbol, timeframe, t_begin, t_end)
     
-    def get_rates_utc(self, timeframe, utc_begin, utc_end):
-        rates = mt5api.copy_rates_range(self.symbol, TimeFrame.const(timeframe), utc_begin, utc_end)
+    def get_rates_utc(self, symbol, timeframe, utc_begin, utc_end):
+        rates = mt5api.copy_rates_range(symbol, TimeFrame.const(timeframe), utc_begin, utc_end)
         return self.parse_rates(rates)
         
-    def get_rates(self, timeframe: str, length: int):
+    def get_rates(self, symbol, timeframe: str, length: int):
         #print(self.symbol, timeframe)
-        rates = mt5api.copy_rates_from_pos(self.symbol,  TimeFrame.const(timeframe), 0, length)
+        rates = mt5api.copy_rates_from_pos(symbol, TimeFrame.const(timeframe), 0, length)
         if rates is None:
             raise Exception('get_rates error')
         return self.parse_rates(rates)
