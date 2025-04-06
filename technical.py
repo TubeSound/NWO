@@ -1603,6 +1603,46 @@ def rally(data, short_term=12, mid_term=24, long_term=48, threshold=0.1, rate=0.
     data[Indicators.RALLY] = sig 
     
     
+def ANKO(data):
+    # -1: descend 1: ascend
+    try:
+        rally = data[Indicators.RALLY]
+        trend = data[Indicators.SUPERTREND]
+    except:
+        raise Exception("NO indicator rally, supertrend")
+    n = len(rally)
+    anko = np.full(n, 0)
+    for i, (r, t) in enumerate(zip(rally, trend)):
+        if r == 1 and t == 1:
+            anko[i] = 1
+        elif r == -1 and t == -1:
+            anko[i] = -1
+    data[Indicators.ANKO] = anko
+    
+    dif = diff(anko)
+    entry = np.full(n, 0)
+    ext = np.full(n, 0)
+    
+    status = 0
+    for i in range(n):
+        if status == 0:
+            if dif[i] == 1:
+                # anko  0 1 1 1 1 0
+                # dif   0 1 0 0 0 -1
+                entry[i] = Signal.LONG
+                status = Signal.LONG
+            elif dif[i] == -1:
+                # anko 0 -1 -1 -1 -1 0
+                # dif  0 -1  0  0  0 1
+                entry[i] = Signal.SHORT
+                status = Signal.SHORT
+        else:
+            if dif[i] != 0:
+                ext[i] = 1
+                status = 0
+    data[Indicators.ANKO_ENTRY] = entry
+    data[Indicators.ANKO_EXIT] = ext
+    
 def diff(array):
     n = len(array)
     out = np.full(n, np.nan)

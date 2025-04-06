@@ -56,15 +56,15 @@ class TimeChart():
         self.fig.scatter(indices, np.array(ys), **kwargs)
     
         
-    def markers(self, signal, values, status, marker='o', color='black', size=10):
-        marks = {'o': 'circle', 'v': 'inversed_triangle', '^': 'triangle', '+': 'cross', 'x': 'x'}
+    def markers(self, signal, values, status, marker='o', color='black', alpha=1.0, size=10):
+        marks = {'o': 'circle', 'v': 'inverted_triangle', '^': 'triangle', '+': 'cross', 'x': 'x'}
         indices = []
         ys = []
         for i, (s, v) in enumerate(zip(signal, values)):
             if s == status:
                 indices.append(i)
                 ys.append(v)
-        self.fig.scatter(indices, np.array(ys), marker=marks[marker], color=color, size=size)
+        self.fig.scatter(indices, np.array(ys), marker=marks[marker], color=color, alpha=alpha, size=size)
         
     def vline(self, index, color):
         if not isinstance(index, int):
@@ -82,6 +82,12 @@ class TimeChart():
         source = ColumnDataSource(dict(x=[self.time_index(time)], y=[y], text=[text]))
         self.fig.add_glyph(source, glyph)
         
+    def plot_background(self, array, colors):
+        for i , a in enumerate(array):
+            if a > 0:
+                self.vline(i, colors[0])
+            elif a < 0:
+                self.vline(i, colors[1])    
         
 class CandleChart(TimeChart):
     def __init__(self, title, width, height, time, date_format='%Y/%m/%d %H:%M', yrange=None):
@@ -100,14 +106,6 @@ class CandleChart(TimeChart):
                     d.append(a)
             out.append(np.array(d))
         return index, out
-                    
-                    
-    def plot_background(self, array, colors):
-        for i , a in enumerate(array):
-            if a > 0:
-                self.vline(i, colors[0])
-            elif a < 0:
-                self.vline(i, colors[1])
                     
     def plot_candle(self, op, hi, lo, cl):
         self.op = np.array(op)

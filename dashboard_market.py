@@ -14,8 +14,8 @@ warnings.simplefilter('ignore')
 from mt5_trade import Mt5Trade, Columns, PositionInfo
 from time_utils import TimeUtils
 from data_buffer import DataBuffer
-from candle_chart import CandleChart
-from technical import rally, SUPERTREND, SUPERTREND_SIGNAL
+from candle_chart import CandleChart, TimeChart
+from technical import rally, SUPERTREND, SUPERTREND_SIGNAL, ANKO
 from common import Indicators
 
 JST = tz.gettz('Asia/Tokyo')
@@ -30,6 +30,7 @@ def calc_indicators(timeframe, data, technical_params):
     rally(data)
     SUPERTREND(data, 10, 3.0)
     SUPERTREND_SIGNAL(data, 10)
+    ANKO(data)
     
 class Mt5Manager:
     def __init__(self, mt5, symbol, timeframe):
@@ -73,9 +74,12 @@ class DataLoader(threading.Thread):
         super().__init__(**kwargs)
         self.data = None
         self.mt5 = mt5
+        self.conditions = None
     
     def get_price(self, remove_last=False):
         out = {}
+        if self.conditions is None:
+            return out
         for symbol, dic in self.conditions.items():
             d = {}
             for timeframe, [indicator_function, param, length, length_margin] in dic.items():
@@ -92,7 +96,7 @@ class DataLoader(threading.Thread):
         self.loop = True
         while self.loop:
             self.data = self.get_price()
-            time.sleep(0.5)
+            time.sleep(10)
         
     def setup(self, conditions):
         self.conditions = conditions
@@ -132,15 +136,24 @@ class Dashboard:
         hi = data[Columns.HIGH]
         lo = data[Columns.LOW]
         cl = data[Columns.CLOSE]
-        chart = CandleChart(f'{self.symbol} {self.timeframe}', 1000, 600, time)
-        chart.plot_background(data[Indicators.RALLY], ['green', 'red'])
-        chart.plot_candle(op, hi, lo, cl)
-        chart.line(data[Indicators.MA_SHORT], color='red', alpha=0.5)
-        chart.line(data[Indicators.MA_MID], color='green', alpha=0.5)
-        chart.line(data[Indicators.MA_LONG], color='blue', alpha=0.5)
-        chart.line(data[Indicators.SUPERTREND_U], color='green', alpha=0.4, line_width=4.0)
-        chart.line(data[Indicators.SUPERTREND_L], color='orange', alpha=0.4, line_width=4.0)
-        return chart.fig
+        chart1 = CandleChart(f'{self.symbol} {self.timeframe}', 1000, 600, time)
+        chart1.plot_background(data[Indicators.RALLY], ['green', 'red'])
+        chart1.plot_candle(op, hi, lo, cl)
+        chart1.line(data[Indicators.MA_SHORT], color='red', alpha=0.5)
+        chart1.line(data[Indicators.MA_MID], color='green', alpha=0.5)
+        chart1.line(data[Indicators.MA_LONG], color='blue', alpha=0.5)
+        chart1.line(data[Indicators.SUPERTREND_U], color='green', alpha=0.4, line_width=4.0)
+        chart1.line(data[Indicators.SUPERTREND_L], color='orange', alpha=0.4, line_width=4.0)
+        
+        entry = data[Indicators.ANKO_ENTRY]
+        ext = data[Indicators.ANKO_EXIT]
+        chart1.markers(entry, cl, 1, marker='^', color='green', alpha=0.7, size=20)
+        chart1.markers(entry, cl, -1, marker='v', color='red', alpha=0.7, size=20)
+        chart1.markers(ext, cl, 1, marker='x', color='black', alpha=0.7, size=30)
+        chart2 = TimeChart('', 1000, 200, time)
+        chart2.line(data[Indicators.RALLY],  color='blue', alpha=0.5, line_width=3.0)
+        chart2.line(data[Indicators.SUPERTREND], color='red', alpha=0.5, line_width=3.0)
+        return [chart1.fig, chart2.fig]
     
                             
     def run(self):
@@ -155,11 +168,14 @@ class Dashboard:
             dic = st.session_state.DataLoader.data
             try:
                 data = dic[self.symbol][self.timeframe]
-                fig = self.create_fig(data)
-                self.placeholder.bokeh_chart(fig)
-            except:
-                pass
-            time.sleep(0.5)
+                figs = self.create_fig(data)
+                container = st.container()
+                container.bokeh_chart(figs[0])
+                container.bokeh_chart(figs[1])
+                self.placeholder.bokeh_chart(container)
+            except Exception as e:
+                print(e)
+            time.sleep(10)
  
 def test():
     dashboard = Dashboard('NIKKEI')
