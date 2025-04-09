@@ -267,3 +267,5 @@ class Simulation:
             self.last_entry_price = price
             self.last_entry_signal = signal
         
+        
+    

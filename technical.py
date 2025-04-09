@@ -1012,19 +1012,23 @@ def SUPERTREND(data: dict,  atr_window: int, multiply, column=Columns.MID):
     data[Indicators.ATR_LOWER] = atr_l
 
     
-def SUPERTREND_SIGNAL(data: dict, short_term):
+def SUPERTREND_SIGNAL(data: dict):
     time = data[Columns.TIME]
     n = len(time)
     cl = data[Columns.CLOSE]
     atr_u = data[Indicators.ATR_UPPER]
     atr_l = data[Indicators.ATR_LOWER]
-    price = sma(cl, short_term)
+    #price = sma(cl, short_term)
+    
+    price = cl
     
     trend = nans(n)
     sig = full(n, 0)
     stop_price = nans(n)
     upper = nans(n)
     lower = nans(n)
+    update = full(n, 0)
+    count = 0
     is_valid = False
     for i in range(1, n):
         if is_valid == False:
@@ -1041,6 +1045,7 @@ def SUPERTREND_SIGNAL(data: dict, short_term):
             else:
                 if atr_l[i] > lower[i - 1]:
                     lower[i] = atr_l[i]
+                    count += 1
                 else:
                     lower[i] = lower[i - 1]
             if price[i] < lower[i]:
@@ -1048,6 +1053,7 @@ def SUPERTREND_SIGNAL(data: dict, short_term):
                 trend[i] = DOWN
                 sig[i] = Signal.SHORT
                 stop_price[i] = lower[i]
+                count = 0
             else:
                 trend[i] = UP
         else:
@@ -1057,6 +1063,7 @@ def SUPERTREND_SIGNAL(data: dict, short_term):
             else:
                 if atr_u[i] < upper[i - 1]:
                     upper[i] = atr_u[i]
+                    count -= 1
                 else:
                     upper[i] = upper[i - 1]
                     
@@ -1065,8 +1072,10 @@ def SUPERTREND_SIGNAL(data: dict, short_term):
                 trend[i] = UP
                 sig[i] = Signal.LONG
                 stop_price[i] = upper[i]
+                count = 0
             else:
                 trend[i] = DOWN
+        update[i] = count
     
     exits = full(n, 0)
     ent = False
@@ -1086,7 +1095,16 @@ def SUPERTREND_SIGNAL(data: dict, short_term):
     data[Indicators.SUPERTREND_EXIT]  = exits     
     data[Indicators.SUPERTREND_U] = upper  
     data[Indicators.SUPERTREND_L] = lower  
+    data[Indicators.SUPERTREND_UPDATE] = update
     return 
+
+def accumulate(array):
+    s = 0
+    out = []
+    for a in array:
+        s += a
+        out.append(s)
+    return out
 
 def MAGAP(timeframe, data: dict, long_term, mid_term, short_term, tap):
     op = data[Columns.OPEN]

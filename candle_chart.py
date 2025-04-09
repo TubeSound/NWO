@@ -66,15 +66,22 @@ class TimeChart():
                 ys.append(v)
         self.fig.scatter(indices, np.array(ys), marker=marks[marker], color=color, alpha=alpha, size=size)
         
-    def vline(self, index, color):
+    def marker(self, time, value, marker='o', color='black', alpha=1.0, size=10):
+        marks = {'o': 'circle', 'v': 'inverted_triangle', '^': 'triangle', '+': 'cross', 'x': 'x'}
+        index = self.time_index(time)
+        if index >= 0 and index <= self.indices[-1]:
+            self.fig.scatter([index], np.array([value]), marker=marks[marker], color=color, alpha=alpha, size=size)    
+        
+    def vline(self, index, color, width=None):
         if not isinstance(index, int):
             index = self.time_index(index)
-        w = self.width / len(self.indices) * 2.1
-        span = Span(location=index - w / 2,
+        if width is None:
+            width = self.width / len(self.indices) 
+        span = Span(location=index,
                     dimension='height',
                     line_color=color,
                     line_alpha=0.1,
-                    line_width=w)
+                    line_width=width)
         self.fig.add_layout(span)
         
     def text(self, time, y, text, color):
@@ -88,6 +95,9 @@ class TimeChart():
                 self.vline(i, colors[0])
             elif a < 0:
                 self.vline(i, colors[1])    
+                
+    def to_png(self, filepath):
+        export_png(self.fig, filename=filepath)
         
 class CandleChart(TimeChart):
     def __init__(self, title, width, height, time, date_format='%Y/%m/%d %H:%M', yrange=None):
@@ -114,11 +124,22 @@ class CandleChart(TimeChart):
         self.cl = np.array(cl)
         ascend = self.cl > self.op
         descend = ~ascend
-        self.fig.segment(self.indices, self.hi, self.indices, self.lo, color="black")
+        n = len(ascend)
+        up = np.full(n, np.nan)
+        under = np.full(n, np.nan)
+        for i, [asc, o, c] in enumerate(zip(ascend, op, cl)):
+            if asc:
+                up[i] = c
+                under[i] = o
+            else:
+                up[i] = o
+                under[i] = c
+        self.fig.segment(self.indices, up, self.indices, self.hi, color="black")
+        self.fig.segment(self.indices, under, self.indices, self.lo, color="black")
         time, values = self.pickup(ascend, [self.op, self.cl])        
-        self.fig.vbar(time, 0.5, values[0], values[1], fill_color="#44a144", line_color="gray")
+        self.fig.vbar(time, 0.5, values[0], values[1], fill_color="cyan", fill_alpha=0.5, line_color="gray")
         time, values = self.pickup(descend, [self.op, self.cl])        
-        self.fig.vbar(time, 0.5, values[0], values[1], fill_color="#F23f3E", line_color="gray")
+        self.fig.vbar(time, 0.5, values[0], values[1], fill_color="red", fill_alpha=0.5, line_color="gray")
         self.min = np.nanmin(self.lo)
         self.max = np.nanmax(self.hi)
         if self.yrange is not None:

@@ -8,20 +8,20 @@ import threading
 import streamlit as st
 import warnings
 
-warnings.simplefilter('ignore')
+#warnings.simplefilter('ignore')
 
 
 from mt5_trade import Mt5Trade, Columns, PositionInfo
 from time_utils import TimeUtils
 from data_buffer import DataBuffer
 from candle_chart import CandleChart, TimeChart
-from technical import rally, SUPERTREND, SUPERTREND_SIGNAL, ANKO
+from technical import rally, SUPERTREND, SUPERTREND_SIGNAL, SQUEEZER, ANKO
 from common import Indicators
 
 JST = tz.gettz('Asia/Tokyo')
 UTC = tz.gettz('utc')  
 
-SYMBOLS = ['', 'NIKKEI', 'DOW', 'NSDQ']
+SYMBOLS = ['', 'NIKKEI', 'DOW', 'NSDQ', 'SP', 'HK50', 'XAUUSD']
 TIMEFRAMES = ['M15', 'M30', 'H1', 'H4', 'D1']
 
 LENGTH_MARGIN = 400
@@ -29,8 +29,9 @@ LENGTH_MARGIN = 400
 def calc_indicators(timeframe, data, technical_params):
     rally(data)
     SUPERTREND(data, 10, 3.0)
-    SUPERTREND_SIGNAL(data, 10)
+    SUPERTREND_SIGNAL(data)
     ANKO(data)
+    SQUEEZER(data, 20, 2, 100)
     
 class Mt5Manager:
     def __init__(self, mt5, symbol, timeframe):
@@ -96,7 +97,7 @@ class DataLoader(threading.Thread):
         self.loop = True
         while self.loop:
             self.data = self.get_price()
-            time.sleep(10)
+            time.sleep(0.5)
         
     def setup(self, conditions):
         self.conditions = conditions
@@ -137,21 +138,23 @@ class Dashboard:
         lo = data[Columns.LOW]
         cl = data[Columns.CLOSE]
         chart1 = CandleChart(f'{self.symbol} {self.timeframe}', 1000, 600, time)
-        chart1.plot_background(data[Indicators.RALLY], ['green', 'red'])
+        rally = data[Indicators.RALLY]
+        chart1.plot_background(rally, ['green', 'red'])
         chart1.plot_candle(op, hi, lo, cl)
         chart1.line(data[Indicators.MA_SHORT], color='red', alpha=0.5)
         chart1.line(data[Indicators.MA_MID], color='green', alpha=0.5)
         chart1.line(data[Indicators.MA_LONG], color='blue', alpha=0.5)
         chart1.line(data[Indicators.SUPERTREND_U], color='green', alpha=0.4, line_width=4.0)
         chart1.line(data[Indicators.SUPERTREND_L], color='orange', alpha=0.4, line_width=4.0)
+        chart1.markers(data[Indicators.SQUEEZER], cl, 1, marker='o', color='red', alpha=0.5, size=10)
         
         entry = data[Indicators.ANKO_ENTRY]
         ext = data[Indicators.ANKO_EXIT]
-        chart1.markers(entry, cl, 1, marker='^', color='green', alpha=0.7, size=20)
-        chart1.markers(entry, cl, -1, marker='v', color='red', alpha=0.7, size=20)
-        chart1.markers(ext, cl, 1, marker='x', color='black', alpha=0.7, size=30)
+        chart1.markers(entry, cl, 1, marker='^', color='green', alpha=0.3, size=20)
+        chart1.markers(entry, cl, -1, marker='v', color='red', alpha=0.3, size=20)
+        chart1.markers(ext, cl, 1, marker='x', color='black', alpha=0.3, size=30)
         chart2 = TimeChart('', 1000, 200, time)
-        chart2.line(data[Indicators.RALLY],  color='blue', alpha=0.5, line_width=3.0)
+        chart2.line(rally,  color='blue', alpha=0.5, line_width=3.0)
         chart2.line(data[Indicators.SUPERTREND], color='red', alpha=0.5, line_width=3.0)
         return [chart1.fig, chart2.fig]
     
@@ -175,7 +178,7 @@ class Dashboard:
                 self.placeholder.bokeh_chart(container)
             except Exception as e:
                 print(e)
-            time.sleep(10)
+            time.sleep(1)
  
 def test():
     dashboard = Dashboard('NIKKEI')
