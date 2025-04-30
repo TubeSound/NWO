@@ -9,7 +9,7 @@ from bokeh.plotting import figure
 from bokeh.plotting import show
 from bokeh.plotting import output_notebook
 from bokeh.layouts import column, row, layout, gridplot
-from bokeh.models import Spacer, Span, Text, Range1d
+from bokeh.models import Spacer, Span, Text, Range1d, LinearAxis, DataRange1d
 from bokeh.models import HoverTool, ColumnDataSource
 from bokeh.io import export_png
 from dateutil import tz
@@ -24,22 +24,27 @@ TOOLTIPS=[  ( 'date',   '@date' ),
         ]
 
 class TimeChart():
-    def __init__(self, title, width, height, time, date_format='%Y/%m/%d %H:%M'):
+    Y_AXIS_2ND = 'axis2nd'
+    
+    
+    def __init__(self, title, height, time, ylabel='', date_format='%Y/%m/%d %H:%M'):
         self.fig = figure(  x_axis_type="linear",
                             tools=TOOLS, 
-                            plot_width=width,
+                            sizing_mode='stretch_width',
                             plot_height=height,
                             tooltips=TOOLTIPS,
+                            y_axis_label=ylabel,
                             title = title)
     
-        self.width = width
         self.height = height
-        self.time = list(time)
+        self.time = time
+        disp_time = time.copy()
+        disp_time = list(disp_time)
         dt = time[-1] - time[-2]
-        for i in range(1, 50):
-            time.append(time[-1] + i * dt)
+        for i in range(1, 100):
+            disp_time.append(time[-1] + i * dt)
         
-        self.fig.xaxis.major_label_overrides = {i: d.strftime(date_format) for i, d in enumerate(time)}
+        self.fig.xaxis.major_label_overrides = {i: d.strftime(date_format) for i, d in enumerate(disp_time)}
         self.indices = range(len(time))
 
     def time_index(self, time):
@@ -47,9 +52,20 @@ class TimeChart():
             if d > time:
                 return i
         return -1      
+ 
+    def add_axis(self, ylabel='', yrange=None):
+        if yrange is None:   
+            self.fig.extra_y_ranges = {self.Y_AXIS_2ND: DataRange1d()}
+        else:
+            self.fig.extra_y_ranges = {self.Y_AXIS_2ND: DataRange1d(start=yrange[0], end=yrange[1])}
+        axis = LinearAxis(y_range_name=self.Y_AXIS_2ND, axis_label=ylabel)
+        self.fig.add_layout(axis,"right")
 
-    def line(self, y, **kwargs):
-        self.fig.line(self.indices, np.array(y), **kwargs)
+    def line(self, y, extra_axis=False, **kwargs):
+        if extra_axis:
+            self.fig.line(self.indices, np.array(y), y_range_name=self.Y_AXIS_2ND, **kwargs)
+        else:
+            self.fig.line(self.indices, np.array(y), **kwargs)
         
     def scatter(self, ts, ys, **kwargs):
         indices = [self.time_index(t) for t in ts]
@@ -57,7 +73,7 @@ class TimeChart():
     
         
     def markers(self, signal, values, status, marker='o', color='black', alpha=1.0, size=10):
-        marks = {'o': 'circle', 'v': 'inverted_triangle', '^': 'triangle', '+': 'cross', 'x': 'x'}
+        marks = {'o': 'circle', 'v': 'inverted_triangle', '^': 'triangle', '+': 'cross', 'x': 'x', '*': 'star'}
         indices = []
         ys = []
         for i, (s, v) in enumerate(zip(signal, values)):
@@ -67,7 +83,7 @@ class TimeChart():
         self.fig.scatter(indices, np.array(ys), marker=marks[marker], color=color, alpha=alpha, size=size)
         
     def marker(self, time, value, marker='o', color='black', alpha=1.0, size=10):
-        marks = {'o': 'circle', 'v': 'inverted_triangle', '^': 'triangle', '+': 'cross', 'x': 'x'}
+        marks = {'o': 'circle', 'v': 'inverted_triangle', '^': 'triangle', '+': 'cross', 'x': 'x', '*': 'star'}
         index = self.time_index(time)
         if index >= 0 and index <= self.indices[-1]:
             self.fig.scatter([index], np.array([value]), marker=marks[marker], color=color, alpha=alpha, size=size)    
@@ -76,7 +92,7 @@ class TimeChart():
         if not isinstance(index, int):
             index = self.time_index(index)
         if width is None:
-            width = self.width / len(self.indices) 
+            width =1000  / len(self.indices) 
         span = Span(location=index,
                     dimension='height',
                     line_color=color,
@@ -84,6 +100,11 @@ class TimeChart():
                     line_width=width)
         self.fig.add_layout(span)
         
+    def hline(self, value, color, extra_axis=False, width=1):
+        array = np.full(len(self.indices), value)
+        self.line(array, extra_axis=extra_axis, line_width=width, color=color)
+        
+            
     def text(self, time, y, text, color):
         glyph = Text(x="x", y="y", text="text",  text_color=color, text_font_size='9pt')
         source = ColumnDataSource(dict(x=[self.time_index(time)], y=[y], text=[text]))
@@ -100,8 +121,8 @@ class TimeChart():
         export_png(self.fig, filename=filepath)
         
 class CandleChart(TimeChart):
-    def __init__(self, title, width, height, time, date_format='%Y/%m/%d %H:%M', yrange=None):
-        super().__init__(title, width, height, time, date_format)
+    def __init__(self, title, height, time, date_format='%Y/%m/%d %H:%M', yrange=None):
+        super().__init__(title, height, time, date_format)
         self.yrange = yrange
 
     def pickup(self, valid, arrays):
@@ -183,6 +204,35 @@ def test():
     export_png(chart.fig, filename='debug.png')
     
     
+def test2():
+    x = [0, 1, 2]
+    y1 = [0, 1, 2]
+    y2 = [0, 1, 100]
+    
+    
+    AXIS2 = "Axis2"
+
+    fig = figure(x_axis_label="x", y_axis_label="y1")
+    fig.extra_y_ranges = {AXIS2: DataRange1d()}
+    fig.add_layout(
+        LinearAxis(
+            y_range_name=AXIS2,
+            axis_label="y2",
+        ),
+        "right",
+    )
+
+    fig.line(x=x, y=y1, legend_label="y1", color="blue")
+    fig.line(
+        x=x,
+        y=y2,
+        legend_label="y2",
+        color="red",
+        y_range_name=AXIS2,
+    )
+
+    export_png(fig, filename='./debug1.png')
+
 
 if __name__ == '__main__':
-    test()
+    test2()

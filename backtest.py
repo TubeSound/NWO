@@ -17,7 +17,7 @@ JST = tz.gettz('Asia/Tokyo')
 UTC = tz.gettz('utc')
 
 from common import Indicators, Columns, Signal
-from technical import SUPERTREND, SUPERTREND_SIGNAL
+from technical import SUPERTREND, ANKO, rally
 from strategy import Simulation
 from time_utils import TimeFilter, TimeUtils
 from data_loader import DataLoader
@@ -105,6 +105,12 @@ def plot_profit(ax, df, t0, t1, rng):
             ax.text(tex, rng[1], f'{prof:.3f}', color='green')
         else:
             ax.text(tex, rng[0], f'{prof:.3f}', color='red')
+            
+def calc_indicators(timeframe, data, technical_params):
+    p = technical_params
+    rally(data, long_term= p['ma_long_period'])
+    SUPERTREND(data, p['atr_period'], p['atr_multiply'])
+    ANKO(data, p['threshold'])
               
 class Backtest():
     
@@ -178,18 +184,18 @@ class Backtest():
     def trade(self, data, trade_param):
         sim = Simulation(data, trade_param)        
         ret = sim.run(data,
-                                            Indicators.SUPERTREND_ENTRY,
-                                            Indicators.SUPERTREND_EXIT,
-                                            Indicators.ATR_UPPER,
-                                            Indicators.ATR_LOWER)
+                                            Indicators.ANKO_ENTRY,
+                                            Indicators.ANKO_EXIT,
+                                            Indicators.ATR_LOWER,
+                                            Indicators.ATR_UPPER)
         df, summary, profit_curve = ret
         trade_num, profit, win_rate = summary
         return (df, summary, profit_curve)
         
     def evaluate(self, dirpath):
         trade_param, k = self.make_trade_param(self.symbol)
-        SUPERTREND(self.data, 10, 3.0)
-        SUPERTREND_SIGNAL(self.data)
+        param = {'ma_long_period': 48, 'atr_period': 10, 'atr_multiply': 3, 'threshold': 5}
+        calc_indicators(self.timeframe, self.data, param)
         (df, summary, profit_curve) = self.trade(self.data, trade_param)
         print(summary)
         df.to_csv(os.path.join(dirpath, 'trade_summary.csv'), index=False)
@@ -225,10 +231,8 @@ def plot_markers(fig, time, df):
             fig.marker(t1, p1, marker='x', color='gray', alpha=0.5, size=20)
     
         
-def main():
+def main(symbol, timeframe):
     days = 10
-    symbol = 'NIKKEI'
-    timeframe = 'M30'
     backtest = Backtest(symbol, timeframe)
     root = f'./evaluate/{symbol}/{timeframe}'
     os.makedirs(root, exist_ok=True)
@@ -248,28 +252,63 @@ def main():
     count = 1
     while t1 <= tend:
         if n > 50:
-            jst = data[Columns.JST]
-            op = data[Columns.OPEN]
-            hi = data[Columns.HIGH]
-            lo = data[Columns.LOW]
-            cl = data[Columns.CLOSE]
-            chart1 = CandleChart(f'{symbol} {timeframe} Supertrend', 1200, 500, jst)
-            chart1.plot_candle(op, hi, lo, cl)   
-           
-            upper = data[Indicators.SUPERTREND_U]
-            lower = data[Indicators.SUPERTREND_L]
-            chart1.line(upper, color='green')
-            chart1.line(lower, color='orange')
-            plot_markers(chart1, jst, df)
-            chart2 = TimeChart('Update', 1200, 200, jst)
-            chart2.line(data[Indicators.SUPERTREND_UPDATE], color='red')
-            figs = [chart1.fig, chart2.fig]
-            l = column(*figs, width=1220, height=720, background='gray')
-            export_png(l, filename=os.path.join(dirpath, f'{count}.png'))  
+            evaluate(symbol, timeframe, count, data, df, dirpath)
             count += 1
         t0 = t1
         t1 = t0 + timedelta(days=days)
         n, data = TimeUtils.slice(data0, Columns.JST, t0, t1)
+   
+   
+def debug(symbol, timeframe):
+    days = 10
+    backtest = Backtest(symbol, timeframe)
+    root = f'./debug/{symbol}/{timeframe}'
+    os.makedirs(root, exist_ok=True)
+    df = backtest.evaluate(root)
+    
+    data0 = backtest.data
+    #analyze(data0)
+    time = data0[Columns.JST]
+    
+    tbegin = time[0]
+    tend = time[-1]
+    
+    t1 = tend
+    t0 = tend - timedelta(days=5)
+    n, data = TimeUtils.slice(data0, Columns.JST, t0, t1)
+    dirpath = os.path.join(root, 'chart')
+    os.makedirs(dirpath, exist_ok=True)   
+    evaluate(symbol, timeframe, 0, data, df, dirpath)
+    df2 = pd.DataFrame(data)
+    df2.to_csv(os.path.join(root, 'data.csv'))
+     
+def analyze(data):
+     for key, value in data.items():
+         print(key, type(value), len(value))    
+     
+            
+def evaluate(symbol, timeframe, count, data, df, dirpath):
+    jst = data[Columns.JST]
+    op = data[Columns.OPEN]
+    hi = data[Columns.HIGH]
+    lo = data[Columns.LOW]
+    cl = data[Columns.CLOSE]
+    
+    chart1 = CandleChart(f'{symbol} {timeframe} Supertrend', 1200, 500, jst)
+    analyze(data)
+    chart1.plot_candle(op, hi, lo, cl)   
+    
+    upper = data[Indicators.SUPERTREND_U]
+    lower = data[Indicators.SUPERTREND_L]
+    chart1.line(upper, color='green')
+    chart1.line(lower, color='orange')
+    plot_markers(chart1, jst, df)
+    chart2 = TimeChart('Update', 1200, 200, jst)
+    chart2.line(data[Indicators.SUPERTREND_UPDATE], color='red')
+    figs = [chart1.fig, chart2.fig]
+    l = column(*figs, width=1220, height=720, background='gray')
+    export_png(l, filename=os.path.join(dirpath, f'{count}.png'))  
+
     
 if __name__ == '__main__':
-    main()
+    debug('NIKKEI', 'M15')

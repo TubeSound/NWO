@@ -39,6 +39,15 @@ class DataLoader:
             t_jst.append(jst)
         return t_utc, t_jst
 
+
+    def str2datetime(self, times, format, tz=UTC):
+        out = []
+        for t in times:
+            d = datetime.strptime(t[:19], format)
+            d1 = d.replace(tzinfo=tz)
+            out.append(d1)
+        return out
+    
     def data_filepath(self, symbol, timeframe, year, month):
         path = '../MarketData/Axiory/'
         dir_path = os.path.join(path, symbol, timeframe)
@@ -78,8 +87,9 @@ class DataLoader:
         #    format='%Y-%m-%d'
         #else:
         format='%Y-%m-%d %H:%M:%S'
-        utc, jst = self.server_time_str_2_datetime(dic[Columns.TIME], tzone, format=format)
-        dic[Columns.TIME] = utc
+        time =  self.str2datetime(df[Columns.TIME], format)
+        jst = self.str2datetime(df[Columns.JST], format, tz=JST)
+        dic[Columns.TIME] = time
         dic[Columns.JST] = jst
         print(symbol, timeframe, 'Data size:', len(jst), jst[0], '-', jst[-1])
         self.size = n

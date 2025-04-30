@@ -25,6 +25,7 @@ class Columns:
     ASK = 'ask'
     BID = 'bid'
     MID = 'mid'
+    HL2 = 'hl2'
     VOLUME = 'volume'
     TIMESTAMP = 'timestamp'
 
@@ -57,6 +58,10 @@ class TimeFrame:
         return TimeFrame.timeframes[timeframe_str]
 
 class Indicators:
+    PROFITS = 'PROFITS'
+    PROFITS_MA = 'PROFITS_MA'
+    PROFITS_PEAKS = 'PROFITS_PEAKS'
+    
     MA = 'MA'
     MA_SHORT = 'MA_SHORT'
     MA_MID = 'MA_MID'
