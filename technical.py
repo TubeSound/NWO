@@ -935,6 +935,20 @@ def MID(data: dict):
         md[i] = (o + c) / 2
     data[Columns.MID] = md
     
+
+def hl2(data: dict):
+    hi = data[Columns.HIGH]
+    lo = data[Columns.LOW]
+    n = len(hi)
+    out = nans(n)
+    for i in range(n):
+        h = hi[i]
+        l = lo[i]
+        if is_nans([h, l]):
+            continue
+        out[i] = (h + l) / 2
+    return out
+    
 def ATR_TRAIL(data: dict, atr_window: int, atr_multiply: float, peak_hold_term: int, horizon: int):
     atr_window = int(atr_window)
     atr_multiply = int(atr_multiply)
@@ -999,18 +1013,18 @@ def ATR_TRAIL(data: dict, atr_window: int, atr_multiply: float, peak_hold_term: 
     data[Indicators.ATR_TRAIL_SIGNAL] = signal
 
              
-def SUPERTREND(data: dict,  atr_window: int, multiply, column=Columns.MID):
+def SUPERTREND(data: dict,  atr_window: int, multiply):
     time = data[Columns.TIME]
-    if column == Columns.MID:
-        MID(data)
-    price = data[column]
+    price = hl2(data)
+    data[Columns.HL2] = price
     n = len(time)
     atr = calc_atr(data, atr_window)
     ATRP(data, atr_window, atr_window)
-    atr_u, atr_l = band(data[column], atr, multiply)
+    atr_u, atr_l = band(price, atr, multiply)
     data[Indicators.ATR_UPPER] = atr_u
     data[Indicators.ATR_LOWER] = atr_l
-
+    data[Indicators.ATR] = atr
+    SUPERTREND_SIGNAL(data)
     
 def SUPERTREND_SIGNAL(data: dict):
     time = data[Columns.TIME]
@@ -1020,7 +1034,7 @@ def SUPERTREND_SIGNAL(data: dict):
     atr_l = data[Indicators.ATR_LOWER]
     #price = sma(cl, short_term)
     
-    price = cl
+    price = data[Columns.HL2]
     
     trend = nans(n)
     sig = full(n, 0)
@@ -1585,8 +1599,6 @@ def breakout(data: dict, n_bo: int, window: int, term_max):
                 current = ent[i]    
     data[Indicators.BREAKOUT_EXIT] = ext
     
-    
-    
 def rally(data, short_term=12, mid_term=24, long_term=48, threshold=0.1, rate=0.7):
     cl = data[Columns.CLOSE]
     n = len(cl)
@@ -1621,45 +1633,105 @@ def rally(data, short_term=12, mid_term=24, long_term=48, threshold=0.1, rate=0.
     data[Indicators.RALLY] = sig 
     
     
-def ANKO(data):
+def dropped(signal, array, begin, length, threshold):
+    n = len(array)
+    values = np.full(n, -1)
+    profit_max = 0
+    for i in range(begin + length - 1, n):
+        i0 = i - length + 1
+        if i0 < 0:
+            continue
+        d = array[begin: i]
+        if signal == Signal.LONG:
+            profit = array[i] - array[begin]
+        else:
+            profit = array[begin] - array[i]
+        if profit > profit_max:
+            profit_max = profit
+        else:
+            if profit_max > 0:
+                rate = (profit_max - profit) / profit_max
+                values[i] = rate
+                if rate > threshold:
+                    return i
+
+    return -1
+                      
+    
+def MA_FILTER(ma, price):
+    out = np.full(len(ma), 0)
+    for i, (m, p) in enumerate(zip(ma, price)):
+        if p > m:
+            out[i] = 1
+        elif p < m:
+            out[i] = -1
+    return out
+    
+def ANKO(data, update_count, profit_ma_period, profit_target, profit_drop, ma_filter_on=True):
     # -1: descend 1: ascend
     try:
-        rally = data[Indicators.RALLY]
-        trend = data[Indicators.SUPERTREND]
+        update = data[Indicators.SUPERTREND_UPDATE]
+        n = len(update)
+        if ma_filter_on:
+            ma = data[Indicators.MA_LONG]
+            ma_filter = MA_FILTER(ma, data[Columns.CLOSE])
+            ma_short = data[Indicators.MA_SHORT]
+            price = data[Columns.CLOSE]
     except:
-        raise Exception("NO indicator rally, supertrend")
-    n = len(rally)
-    anko = np.full(n, 0)
-    for i, (r, t) in enumerate(zip(rally, trend)):
-        if r == 1 and t == 1:
-            anko[i] = 1
-        elif r == -1 and t == -1:
-            anko[i] = -1
-    data[Indicators.ANKO] = anko
-    
-    dif = diff(anko)
+        raise Exception("NO indicator rally, supertrend")    
     entry = np.full(n, 0)
-    ext = np.full(n, 0)
-    
-    status = 0
-    for i in range(n):
-        if status == 0:
-            if dif[i] == 1:
-                # anko  0 1 1 1 1 0
-                # dif   0 1 0 0 0 -1
-                entry[i] = Signal.LONG
-                status = Signal.LONG
-            elif dif[i] == -1:
-                # anko 0 -1 -1 -1 -1 0
-                # dif  0 -1  0  0  0 1
-                entry[i] = Signal.SHORT
-                status = Signal.SHORT
+    ext = np.full(n, 0) 
+    state = 0
+    for i, u in enumerate(update):
+        if state == 0:
+            trigger = 0
+            if u >=update_count:
+                if ma_filter_on:
+                    if ma_filter[i] == 1:
+                        trigger = Signal.LONG
+                else:
+                    trigger = Signal.LONG
+            elif u <= - update_count:
+                if ma_filter_on:
+                    if ma_filter[i] == -1:
+                        trigger = Signal.SHORT
+                else:
+                    trigger = Signal.SHORT
+            if trigger != 0:
+                entry[i] = trigger
+                state = trigger            
         else:
-            if dif[i] != 0:
+            if u == 0:
+                state = 0
                 ext[i] = 1
-                status = 0
+                
+    #ext = np.full(n, 0)            
+    #for i, sig in enumerate(entry):
+    #    if sig != 0:
+    #        j = dropped(sig, ma_short, i, 7, close_drop_rate)
+    #        if j >= 0:
+    #            ext[j] = sig
+                
     data[Indicators.ANKO_ENTRY] = entry
-    data[Indicators.ANKO_EXIT] = ext
+    #data[Indicators.ANKO_EXIT] = ext
+    
+    prof =  profits(data[Columns.CLOSE], entry, ext)
+    prof_ma = sma(prof, profit_ma_period)
+    data[Indicators.PROFITS] = prof
+    data[Indicators.PROFITS_MA] = prof_ma
+    
+    peak_indices = detect_dip(prof_ma, profit_target, profit_drop)
+    peaks = indices_to_array(peak_indices, len(prof))
+    data[Indicators.ANKO_EXIT] = peaks
+    data[Indicators.PROFITS_PEAKS] = peaks
+    
+    
+def indices_to_array(indices, length):
+    out = np.full(length, 0)
+    for index in indices:
+        out[index] = 1
+    return out
+    
     
 def diff(array):
     n = len(array)
@@ -1668,9 +1740,91 @@ def diff(array):
         out[i] = array[i] - array[i - 1]
     return out
 
-def detect_peaks(vector):
+def detect_peak(vector):
    peaks, _ = find_peaks(vector, plateau_size=1)
    return peaks
+
+
+def detect_dip(profit, target, dip):
+    def find_valid(array, begin):
+        for i in range(begin, len(array)):
+            if not np.isnan(array[i]):
+                return i
+        return -1
+    def find_nan(array, begin):
+        for i in range(begin, len(array)):
+            if np.isnan(array[i]):
+                return i
+        return -1
+    
+    n = len(profit)
+    dip_indices = []
+    i_begin = 0
+    while True:
+        i_begin = find_valid(profit, i_begin)
+        if i_begin < 0 or i_begin == n - 1:
+            break
+        i_stop = find_nan(profit, i_begin + 1)
+        if i_stop < 0:
+            i_stop = n
+        v = profit[i_begin: i_stop]
+        index = trailing_dip(v, target, dip)
+        if index > 0:
+            dip_indices.append(i_begin + index)
+        else:
+            if i_stop < n:
+                dip_indices.append(i_stop)
+        i_begin = i_stop
+        if i_begin >= n - 1:
+            break
+    return dip_indices
+
+def trailing_dip(profits, targets, drops):
+    def get_drop(profit):
+        for i in range(len(targets) - 1, -1, -1):
+            target = targets[i]
+            drop = drops[i]
+            if profit >= target:
+                return i, drop
+        return -1, drops[-1] 
+    
+    n = len(profits)
+    vmax = 0
+    for i in range(n):
+        profit = profits[i]
+        level, drop = get_drop(profit)
+        if level == 0:
+            continue
+        if profit > vmax:
+            vmax = profit
+        else:
+            if (vmax - profit) >= drop:
+                return i
+    return -1
+
+
+def profits(prices, entries, exits):
+    n = len(prices)
+    prof = np.full(n, np.nan)
+    if exits is None:
+        exits = np.full(n, 0)
+    state = 0
+    for i, (entry, ext) in enumerate(zip(entries, exits)):
+        if state == 0:
+            p0 = prices[i]
+            state = entry
+        else:
+            if ext != 0:
+                #prof[i] = 0
+                state = 0
+            else:
+                if state == Signal.LONG:
+                    prof[i] = prices[i] - p0
+                else:
+                    prof[i] = p0 - prices[i]
+    return prof
+    
+    
 
 def test():
     sig = [29301.79, 29332.16, 28487.87, 28478.56, 28222.48,

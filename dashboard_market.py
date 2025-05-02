@@ -14,7 +14,7 @@ from mt5_trade import Mt5Trade, Columns, PositionInfo
 from time_utils import TimeUtils
 from data_buffer import DataBuffer
 from candle_chart import CandleChart, TimeChart
-from technical import rally, SUPERTREND, SUPERTREND_SIGNAL, SQUEEZER, ANKO
+from technical import rally, SUPERTREND, SUPERTREND_SIGNAL, SQUEEZER, ANKO, ATRP
 from common import Indicators
 
 JST = tz.gettz('Asia/Tokyo')
@@ -37,7 +37,11 @@ def calc_indicators(timeframe, data, technical_params):
     p = technical_params
     rally(data, long_term= p['ma_long_period'])
     SUPERTREND(data, p['atr_period'], p['atr_multiply'])
-    ANKO(data, p['update_count'], p['profit_ma_period'], p['target_profit'], p['drop_profit'])
+    ANKO(data, p['update_count'], p['profit_ma_period'], p['profit_target'], p['profit_drop'])
+    
+def calc_indicators2(timeframe, data, technical_params):
+    w = technical_params['atr_window']
+    ATRP(data, w, w)
     
 class Mt5Manager:
     def __init__(self, mt5, symbol, timeframe):
@@ -126,30 +130,25 @@ class Dashboard:
             page_title=title,
             layout="wide",
         )    
-        self.build_sidebar()
+        self.set_param()
         self.placeholder = st.empty()
         self.loop = False
         self.mt5 =  Mt5Trade()
         self.mt5.connect()
         
-    def build_sidebar(self):
+    def set_param(self):
         self.symbol = st.sidebar.selectbox('Symbol', SYMBOLS)
         self.timeframe = st.sidebar.selectbox('Timeframe', TIMEFRAMES)
         self.length = st.sidebar.selectbox('Length', DATA_LENGTH)
         self.ma_long_period = st.sidebar.selectbox('MA Long period', [40, 20, 60, 100])
-        
         self.atr_period = st.sidebar.selectbox('ATR period', [10, 15, 20, 25, 30])
         self.atr_multiply = st.sidebar.selectbox('ATR multiply', [3.0, 1.0, 1.5, 2.5, 3.0, 3.5, 4.0])
         self.update_count = st.sidebar.selectbox('Update count', UPDATE_COUNT)
-        
         self.profit_ma_period = st.sidebar.selectbox('Profit MA period', [5, 3, 7, 10, 20])
-        target = [50, 25, 100, 150, 200, 300, 400]
-        drop = [25, 50, 100, 150, 200]
-        if self.symbol == 'XAUUSD':
-            target = [10, 5, 20, 30, 40, 50]
-            drop = [5, 2, 10, 15, 20]
-        self.target_profiit = st.sidebar.selectbox('Target profit', target)
-        self.drop_profit = st.sidebar.selectbox('Drop profit', drop)
+        
+        self.profit_target = [50, 100, 200, 300, 400]
+        self.profit_drop   = [25, 50,   50, 100, 200]
+        
         
     def separate(sellf, array, threshold):
         n = len(array)
@@ -173,14 +172,27 @@ class Dashboard:
         r3 = float(int(r2 + 0.5)) * rate
         return r3
         
+    def expand(self, time, time1h, atr1h):
+        n = len(time)
+        atr = np.full(n, np.nan)
+        for t1h, a in zip(time1h, atr1h):
+            for i, t in enumerate(time):
+                if t == t1h:
+                    atr[i] = a
+                    break
+        for i in range(1, n):
+            if np.isnan(atr[i]):
+                if not np.isnan(atr[i - 1]):
+                    atr[i] = atr[i - 1]                
+        return atr
         
-    def create_fig(self, data):
+    def create_fig(self, data, data2):
         time = data[Columns.JST]
         op = data[Columns.OPEN]
         hi = data[Columns.HIGH]
         lo = data[Columns.LOW]
         cl = data[Columns.CLOSE]
-        chart1 = CandleChart(f'{self.symbol} {self.timeframe}', 600, time)
+        chart1 = CandleChart(f'{self.symbol} {self.timeframe}', None, 400, time)
         rally = data[Indicators.RALLY]
         chart1.plot_background(rally, ['green', 'red'])
         chart1.plot_candle(op, hi, lo, cl)
@@ -188,7 +200,7 @@ class Dashboard:
         #chart1.line(data[Indicators.MA_MID], color='green', alpha=0.5)
         chart1.line(data[Indicators.MA_LONG], color='blue', alpha=0.4, line_width=3.0, legend_label='MA Long')
         #chart1.line(data[Indicators.ATR_UPPER], color='orange', alpha=0.4, line_width=1)
-        #chart1.line(data[Indicators.ATR_LOWER], color='green', alpha=0.4, line_width=1)
+        #chart1.line(data[Indicators.ATR_LOWER], color='green', alpha=0.4,No line_width=1)
         #chart1.line(data[Indicators.SUPERTREND_U], color='orange', alpha=0.4, line_width=4.0)
         #chart1.line(data[Indicators.SUPERTREND_L], color='green', alpha=0.4, line_width=4.0)
         #chart1.markers(data[Indicators.SQUEEZER], cl, 1, marker='o', color='red', alpha=0.5, size=10)
@@ -212,17 +224,23 @@ class Dashboard:
         chart1.hline(0.0, 'black', extra_axis=True)
         chart1.fig.legend.location = 'top_left'
         
-        
-        chart2 = TimeChart('Profit', 200, time)
+        chart2 = TimeChart('Profit', None, 200, time)
         chart2.line(data[Indicators.PROFITS],  color='blue', alpha=0.5, line_width=3.0, legend_label='Profit')
         chart2.line(data[Indicators.PROFITS_MA],  color='red', alpha=0.5, line_width=3.0, legend_label='Profit MA')
         chart2.markers(data[Indicators.PROFITS_PEAKS], data[Indicators.PROFITS], 1, marker='o', color='red', alpha=0.5, size=10)
         chart2.hline(0.0, 'black')
         chart2.fig.legend.location = 'top_left'
-         
-        #chart2.line(data[Indicators.SUPERTREND], color='red', alpha=0.5, line_width=3.0)
         chart2.fig.x_range = chart1.fig.x_range
-        figs = [chart1.fig, chart2.fig]
+        
+        atrp1h = self.expand(time, data2[Columns.JST], data2[Indicators.ATRP])
+        chart3 = TimeChart('ATRP', None, 200, time)
+        chart3.line(data[Indicators.ATRP],  color='blue', alpha=0.5, line_width=3.0, legend_label='ATRP')
+        chart3.line(atrp1h,  color='red', alpha=0.5, line_width=3.0, legend_label='ATRP H1')
+        chart3.hline(0.0, 'black')
+        chart3.fig.legend.location = 'top_left'
+        chart3.fig.x_range = chart1.fig.x_range
+        
+        figs = [chart1.fig, chart2.fig, chart3.fig]
         l = column(*figs, sizing_mode='stretch_width', height=800, background='gray')
         return l #chart1.fig
     
@@ -240,16 +258,22 @@ class Dashboard:
                         'atr_multiply': self.atr_multiply,
                         'update_count': self.update_count,
                         'profit_ma_period': self.profit_ma_period,
-                        'target_profit': self.target_profiit,
-                        'drop_profit': self.drop_profit}
-            conditions = {self.symbol: {self.timeframe: [calc_indicators, param, self.length, LENGTH_MARGIN]}}
+                        'profit_target': self.profit_target,
+                        'profit_drop': self.profit_drop}
+            
+            c = {self.timeframe: [calc_indicators, param, self.length, LENGTH_MARGIN],
+                 'H1': [calc_indicators2, {'atr_window': 40}, self.length, LENGTH_MARGIN]}
+            
+            
+            conditions = {self.symbol:c}
             st.session_state.DataLoader.setup(conditions)    
             self.loop = True    
         while self.loop:            
             dic = st.session_state.DataLoader.data
             try:
                 data = dic[self.symbol][self.timeframe]
-                container = self.create_fig(data)
+                data_atr = dic[self.symbol]['H1']
+                container = self.create_fig(data, data_atr)
                 self.placeholder.bokeh_chart(container)
             except Exception as e:
                 print(e)

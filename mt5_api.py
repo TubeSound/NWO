@@ -9,7 +9,11 @@ from time_utils import TimeUtils
 JST = tz.gettz('Asia/Tokyo')
 UTC = tz.gettz('utc')  
         
-def server_time(begin_month, begin_sunday, end_month, end_sunday, delta_hour_from_gmt_in_summer):
+
+DELTA_HOURS_FROM_UTC = 3.0 # Axiory Server time hour from UTC
+        
+        
+def server_time(begin_month, begin_sunday, end_month, end_sunday, delta_hour_from_gmt_in_summer=DELTA_HOURS_FROM_UTC):
     now = datetime.now(JST)
     dt, tz = TimeUtils.delta_hour_from_gmt(now, begin_month, begin_sunday, end_month, end_sunday, delta_hour_from_gmt_in_summer)
     #delta_hour_from_gmt  = dt
@@ -18,17 +22,19 @@ def server_time(begin_month, begin_sunday, end_month, end_sunday, delta_hour_fro
     return dt, tz  
   
 def server_time_to_utc(time: datetime):
-    dt, tz = server_time(3, 2, 11, 1, 3.0)
+    dt, tz = server_time(3, 2, 11, 1)
     return time - dt
 
 def utc_to_server_time(utc: datetime): 
-    dt, tz = server_time(3, 2, 11, 1, 3.0)
+    dt, tz = server_time(3, 2, 11, 1)
     return utc + dt
 
 def adjust(time):
     utc = []
     jst = []
-    for ts in time:
+    for i, ts in enumerate(time):
+        if i == len(time) - 1:
+            pass
         #t0 = pd.to_datetime(ts)
         t0 = ts.replace(tzinfo=UTC)
         t = server_time_to_utc(t0)

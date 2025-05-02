@@ -27,15 +27,24 @@ class TimeChart():
     Y_AXIS_2ND = 'axis2nd'
     
     
-    def __init__(self, title, height, time, ylabel='', date_format='%Y/%m/%d %H:%M'):
-        self.fig = figure(  x_axis_type="linear",
-                            tools=TOOLS, 
-                            sizing_mode='stretch_width',
-                            plot_height=height,
-                            tooltips=TOOLTIPS,
-                            y_axis_label=ylabel,
-                            title = title)
-    
+    def __init__(self, title, width, height, time, ylabel='', date_format='%Y/%m/%d %H:%M'):
+        if width is None:        
+            self.fig = figure(  x_axis_type="linear",
+                                tools=TOOLS, 
+                                sizing_mode='stretch_width',
+                                plot_height=height,
+                                tooltips=TOOLTIPS,
+                                y_axis_label=ylabel,
+                                title = title)
+        else:
+            self.fig = figure(  x_axis_type="linear",
+                    tools=TOOLS, 
+                    plot_width=width,
+                    plot_height=height,
+                    tooltips=TOOLTIPS,
+                    y_axis_label=ylabel,
+                    title = title)
+        self.width = width
         self.height = height
         self.time = time
         disp_time = time.copy()
@@ -121,8 +130,8 @@ class TimeChart():
         export_png(self.fig, filename=filepath)
         
 class CandleChart(TimeChart):
-    def __init__(self, title, height, time, date_format='%Y/%m/%d %H:%M', yrange=None):
-        super().__init__(title, height, time, date_format)
+    def __init__(self, title, width, height, time, date_format='%Y/%m/%d %H:%M', yrange=None):
+        super().__init__(title, width, height, time, date_format)
         self.yrange = yrange
 
     def pickup(self, valid, arrays):
