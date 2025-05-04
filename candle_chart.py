@@ -20,7 +20,7 @@ output_notebook()
 
 TOOLS = "pan,wheel_zoom,box_zoom,box_select,crosshair,reset,save"
 TOOLTIPS=[  ( 'date',   '@date' ),
-            ( 'close',  '@close{0,0}' ), 
+            ( 'close',  '@y' ), 
         ]
 
 class TimeChart():
@@ -33,7 +33,6 @@ class TimeChart():
                                 tools=TOOLS, 
                                 sizing_mode='stretch_width',
                                 plot_height=height,
-                                tooltips=TOOLTIPS,
                                 y_axis_label=ylabel,
                                 title = title)
         else:
@@ -41,7 +40,6 @@ class TimeChart():
                     tools=TOOLS, 
                     plot_width=width,
                     plot_height=height,
-                    tooltips=TOOLTIPS,
                     y_axis_label=ylabel,
                     title = title)
         self.width = width
@@ -132,6 +130,7 @@ class TimeChart():
 class CandleChart(TimeChart):
     def __init__(self, title, width, height, time, date_format='%Y/%m/%d %H:%M', yrange=None):
         super().__init__(title, width, height, time, date_format)
+        self.date_format = date_format
         self.yrange = yrange
 
     def pickup(self, valid, arrays):
@@ -167,9 +166,20 @@ class CandleChart(TimeChart):
         self.fig.segment(self.indices, up, self.indices, self.hi, color="black")
         self.fig.segment(self.indices, under, self.indices, self.lo, color="black")
         time, values = self.pickup(ascend, [self.op, self.cl])        
-        self.fig.vbar(time, 0.5, values[0], values[1], fill_color="cyan", fill_alpha=0.5, line_color="gray")
+        r1 = self.fig.vbar(time, 0.5, values[0], values[1], fill_color="cyan", fill_alpha=0.5, line_color="gray")
         time, values = self.pickup(descend, [self.op, self.cl])        
         self.fig.vbar(time, 0.5, values[0], values[1], fill_color="red", fill_alpha=0.5, line_color="gray")
+        
+        hover = HoverTool(  renderers=[r1],
+                            tooltips=[
+                                        ("Date", "@Date1{" + self.date_format + "}"),
+                                    ],
+                            formatters={'@Date1': 'datetime',},
+                            mode='vline', # 縦線に相当する値を表示
+                            # mode='mouse',  # マウスポインタを合わせたときに表示
+                        )
+        self.fig.add_tools(hover)
+        
         self.min = np.nanmin(self.lo)
         self.max = np.nanmax(self.hi)
         if self.yrange is not None:

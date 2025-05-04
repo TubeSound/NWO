@@ -9,6 +9,10 @@ import numpy as np
 from candle_chart import TimeChart, CandleChart
 from bokeh.layouts import column, row, layout, gridplot
 from bokeh.io import export_png
+from bokeh.plotting import show
+from bokeh.plotting import output_notebook
+output_notebook() 
+
 
 import pandas as pd
 import pickle
@@ -159,7 +163,7 @@ class Backtest():
             trail_target = random.randint(1, 10) * 50
             trail_stop = random.randint(1, 10) * 20
         else:
-            sl = 50
+            sl = 500
             trail_target = 300
             trail_stop = 200
         
@@ -208,7 +212,7 @@ class Backtest():
         print(summary)
         df.to_csv(os.path.join(dirpath, 'trade_summary.csv'), index=False)
         
-        chart = TimeChart('NIKKEI M30 SUPERTREND', 800, 400, profit_curve[0])
+        chart = TimeChart(f'{self.symbol} {self.timeframe} ANKO', 800, 400, profit_curve[0])
         chart.line(profit_curve[1], color='blue')
         chart.to_png(os.path.join(dirpath, 'profit.png'))    
         return df
@@ -227,7 +231,8 @@ def plot_markers(fig, time, df):
     t_exit = to_datetime(df, 'exit_time')
     price_entry = df['entry_price'].to_list()
     price_exit = df['exit_price'].to_list()
-    for s, t0, t1, p0, p1 in zip(signal, t_entry, t_exit, price_entry, price_exit):
+    loscut = df['losscuted'].to_list()
+    for s, t0, t1, p0, p1, ls in zip(signal, t_entry, t_exit, price_entry, price_exit, loscut):
         if t1 >= time[0] and t1 <= time[-1]:
             if s == 1:
                 marker = '^'
@@ -236,11 +241,12 @@ def plot_markers(fig, time, df):
                 marker = 'v'
                 color = 'red'
             fig.marker(t0, p0, marker=marker, color=color, alpha=0.5, size=20)
-            fig.marker(t1, p1, marker='*', color='gray', alpha=0.7, size=30)
+            marker = 'x' if ls else '*'
+            fig.marker(t1, p1, marker=marker, color='gray', alpha=0.7, size=30)
     
         
 def main(symbol, timeframe):
-    days = 10
+    days = 20
     backtest = Backtest(symbol, timeframe)
     root = f'./evaluate/{symbol}/{timeframe}'
     os.makedirs(root, exist_ok=True)
@@ -262,13 +268,14 @@ def main(symbol, timeframe):
         if n > 50:
             l = create_fig(data, df) 
             export_png(l, filename=os.path.join(dirpath, f'{count}.png'))  
+            show(l)
             count += 1
         t0 = t1
         t1 = t0 + timedelta(days=days)
         n, data = TimeUtils.slice(data0, Columns.JST, t0, t1)
    
 def debug(symbol, timeframe):
-    days = 4
+    days = 10
     backtest = Backtest(symbol, timeframe)
     root = f'./debug/{symbol}/{timeframe}'
     os.makedirs(root, exist_ok=True)
@@ -284,11 +291,15 @@ def debug(symbol, timeframe):
     n, data = TimeUtils.slice(data0, Columns.JST, t0, t1)
     backtest.data = data    
     df = backtest.evaluate(root)
+    l = create_fig(data, df) 
+    export_png(l, filename=os.path.join(root, '0.png'))  
+    show(l)
     
     dirpath = os.path.join(root, 'chart')
     os.makedirs(dirpath, exist_ok=True)   
     df2 = pd.DataFrame(data)
     df2.to_csv(os.path.join(root, 'data.csv'))
+    return l
      
 def analyze(data):
      for key, value in data.items():
@@ -316,12 +327,13 @@ def calc_range(lo, hi, k=2):
     return r3
          
 def create_fig(data, df):
+    w = 1200
     time = data[Columns.JST]
     op = data[Columns.OPEN]
     hi = data[Columns.HIGH]
     lo = data[Columns.LOW]
     cl = data[Columns.CLOSE]
-    chart1 = CandleChart('', 1200, 400, time)
+    chart1 = CandleChart('', w, 400, time)
     rally = data[Indicators.RALLY]
     chart1.plot_background(rally, ['green', 'red'])
     chart1.plot_candle(op, hi, lo, cl)
@@ -346,24 +358,24 @@ def create_fig(data, df):
     chart1.fig.legend.location = 'top_left'
     plot_markers(chart1, time, df)
     
-    chart2 = TimeChart('Profit', 1200, 200, time)
+    chart2 = TimeChart('Profit', w, 150, time)
     chart2.line(data[Indicators.PROFITS],  color='blue', alpha=0.5, line_width=3.0, legend_label='Profit')
-    chart2.line(data[Indicators.PROFITS_MA],  color='red', alpha=0.5, line_width=3.0, legend_label='Profit MA')
+    chart2.line(data[Indicators.PROFITS_CLOSE],  color='red', alpha=0.5, line_width=3.0, legend_label='Profit (Close)')
     chart2.markers(data[Indicators.PROFITS_PEAKS], data[Indicators.PROFITS], 1, marker='o', color='red', alpha=0.5, size=10)
     chart2.hline(0.0, 'black')
     chart2.fig.legend.location = 'top_left'
     chart2.fig.x_range = chart1.fig.x_range
     
-    chart3 = TimeChart('ATRP', 1200, 200, time)
+    chart3 = TimeChart('ATRP', w, 150, time)
     chart3.line(data[Indicators.ATRP],  color='blue', alpha=0.5, line_width=3.0, legend_label='ATRP')
     chart3.hline(0.0, 'black')
     chart3.fig.legend.location = 'top_left'
     chart3.fig.x_range = chart1.fig.x_range
         
     figs = [chart1.fig, chart2.fig, chart3.fig]
-    l = column(*figs, width=1200, height=800, background='gray')
+    l = column(*figs, width=w, height=700, background='gray')
     return l #chart1.fig
                 
     
 if __name__ == '__main__':
-    main('NIKKEI', 'H1')
+    debug('NIKKEI', 'M15')

@@ -60,6 +60,7 @@ class TimeFrame:
 class Indicators:
     PROFITS = 'PROFITS'
     PROFITS_MA = 'PROFITS_MA'
+    PROFITS_CLOSE = 'PROFITS_CLOSE'
     PROFITS_PEAKS = 'PROFITS_PEAKS'
     
     MA = 'MA'

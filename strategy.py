@@ -136,7 +136,7 @@ class Positions:
         for i, position in enumerate(self.positions):
             if index == position.entry_index:
                 continue
-            if position.signal == signal:
+            if (signal is None) or (position.signal == signal):
                 position.exit(index, time, price, doten=doten)         
                 removed.append(position)
             else:
@@ -238,7 +238,7 @@ class Simulation:
                 break
             self.positions.update(i, time[i], op[i], hi[i], lo[i], cl[i])
             if ext[i] != 0:
-                self.positions.exit_all_signal(ext[i], i, time[i], cl[i])
+                self.positions.exit_all_signal(None, i, time[i], cl[i])
             if entry[i] != 0:
                 if entry[i] == Signal.LONG:
                     sl = cl[i] - self.sl_value

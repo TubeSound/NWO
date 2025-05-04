@@ -1715,12 +1715,13 @@ def ANKO(data, update_count, profit_ma_period, profit_target, profit_drop, ma_fi
     data[Indicators.ANKO_ENTRY] = entry
     #data[Indicators.ANKO_EXIT] = ext
     
-    prof =  profits(data[Columns.CLOSE], entry, ext)
-    prof_ma = sma(prof, profit_ma_period)
+    prof_cl, prof =  profits(data[Columns.CLOSE], data[Columns.HIGH], data[Columns.LOW], entry, ext)
+    prof_ma = sma(prof_cl, profit_ma_period)
+    data[Indicators.PROFITS_CLOSE] = prof_cl
     data[Indicators.PROFITS] = prof
     data[Indicators.PROFITS_MA] = prof_ma
     
-    peak_indices = detect_dip(prof_ma, profit_target, profit_drop)
+    peak_indices = detect_dip(prof_cl, profit_target, profit_drop)
     peaks = indices_to_array(peak_indices, len(prof))
     data[Indicators.ANKO_EXIT] = peaks
     data[Indicators.PROFITS_PEAKS] = peaks
@@ -1788,6 +1789,8 @@ def trailing_dip(profits, targets, drops):
                 return i, drop
         return -1, drops[-1] 
     
+    return -1
+    
     n = len(profits)
     vmax = 0
     for i in range(n):
@@ -1803,15 +1806,16 @@ def trailing_dip(profits, targets, drops):
     return -1
 
 
-def profits(prices, entries, exits):
-    n = len(prices)
+def profits(cl, hi, lo, entries, exits):
+    n = len(cl)
+    prof_cl = np.full(n, np.nan)
     prof = np.full(n, np.nan)
     if exits is None:
         exits = np.full(n, 0)
     state = 0
     for i, (entry, ext) in enumerate(zip(entries, exits)):
         if state == 0:
-            p0 = prices[i]
+            p0 = cl[i]
             state = entry
         else:
             if ext != 0:
@@ -1819,10 +1823,12 @@ def profits(prices, entries, exits):
                 state = 0
             else:
                 if state == Signal.LONG:
-                    prof[i] = prices[i] - p0
+                    prof_cl[i] = cl[i] - p0
+                    prof[i] = lo[i] - p0
                 else:
-                    prof[i] = p0 - prices[i]
-    return prof
+                    prof_cl[i] = p0 - cl[i]
+                    prof[i] = p0 - hi[i]
+    return prof_cl, prof
     
     
 
