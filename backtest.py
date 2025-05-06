@@ -125,61 +125,47 @@ class Backtest():
             data0 = pickle.load(f)
         return data0                
                 
-    def make_trade_param(self, symbol, randomize=False):
-        begin_hour = 0
-        begin_minute = 0
-        hours = 0
+    
+    def sl_fix(self, symbol, randomize=False):    
         if symbol == 'XAUUSD':
-            k = 0.1
-        if symbol == 'XAGUSD':
-            k = 0.001
-        elif symbol == 'XPDUSD':
-            k = 0.005
-        elif symbol == 'CL':
-            k = 0.002
-        elif symbol == 'NSDQ':
-            k = 0.5
-        elif symbol == 'USDJPY':
-            k = 0.001
-        elif symbol == 'TSLA':
-            k = 0.01
-            begin_hour = 21
-            begin_minute = 0
-            hours = 7
-        elif symbol == 'NVDA':
-            k = 0.003
-            begin_hour = 21
-            begin_minute = 0
-            hours = 7
-        elif symbol == 'DAX':
-            k = 0.5
-        elif symbol == 'HK50':
-            k = 0.5
-        else:
-            k = 1.0
-        
-        if randomize:
-            sl = random.randint(1, 10) * 20
-            trail_target = random.randint(1, 10) * 50
-            trail_stop = random.randint(1, 10) * 20
-        else:
+            sl = 10
+        elif symbol == 'NIKKEI':
             sl = 500
-            trail_target = 300
-            trail_stop = 200
-        
+        elif symbol == 'DOW':
+            sl = 200
+        elif symbol == 'NSDQ':
+            sl = 50
+        elif symbol == 'USDJPY':
+            sl = 0.5
+        return Simulation.SL_FIX, [sl]
+                
+    def sl_range(symbol):
+        if symbol == 'XAUUSD':
+            sl = 10
+        elif symbol == 'NIKKEI':
+            sl = 200
+        elif symbol == 'DOW':
+            sl = 200
+        elif symbol == 'NSDQ':
+            sl = 50
+        elif symbol == 'USDJPY':
+            sl = 0.5        
+        return Simulation.SL_RANGE, [10, sl] 
+                
+    def make_trade_param(self, symbol, sl_method, sl):
         param =  {
                     'strategy': 'anko',
-                    'begin_hour': begin_hour,
-                    'begin_minute': begin_minute,
-                    'hours': hours,
-                    'sl_method': Simulation.SL_FIX,
-                    'sl_value': int(sl * k),
+                    'begin_hour': 0,
+                    'begin_minute': 0,
+                    'hours': 0,
+                    'sl_method': sl_method,
+                    'sl_value': sl,
                     'trail_target':0,
                     'trail_stop': 0, 
                     'volume': 0.1, 
                     'position_max':2, 
                     'timelimit': 0}
-        return param, k    
+        return param
     
     def make_technical_param(self):
         param = { 
@@ -187,6 +173,7 @@ class Backtest():
                 'atr_period': 10,
                 'atr_multiply': 3.0,
                 'update_count': 5,
+                'atrp_period': 40,
                 'profit_ma_period': 5,
                 'profit_target': [50, 100, 200, 300, 400],
                 'profit_drop':  [25, 50,   50, 100, 200]
@@ -195,26 +182,27 @@ class Backtest():
 
     def trade(self, data, trade_param):
         sim = Simulation(data, trade_param)        
-        ret = sim.run(data,
-                                            Indicators.ANKO_ENTRY,
-                                            Indicators.ANKO_EXIT,
-                                            None,
-                                            None)
+        ret = sim.run(data, Indicators.ANKO_ENTRY, Indicators.ANKO_EXIT)
         df, summary, profit_curve = ret
         trade_num, profit, win_rate = summary
         return (df, summary, profit_curve)
         
-    def evaluate(self, dirpath):
-        trade_param, k = self.make_trade_param(self.symbol)
+    def evaluate(self, dirpath, save=True, plot=True):
+        method, sl = self.sl_fix(self.symbol)
+        trade_param = self.make_trade_param(self.symbol, method, sl)
         technical_param = self.make_technical_param()
         calc_indicators(self.timeframe, self.data, technical_param)
         (df, summary, profit_curve) = self.trade(self.data, trade_param)
-        print(summary)
+        trade_num, profit, win_rate = summary
+        #print(summary)
         df.to_csv(os.path.join(dirpath, 'trade_summary.csv'), index=False)
         
-        chart = TimeChart(f'{self.symbol} {self.timeframe} ANKO', 800, 400, profit_curve[0])
+        chart = TimeChart(f'[ANKO] {self.symbol} {self.timeframe} Total Profit: {profit} n: {trade_num} win: {win_rate * 100}%', 800, 400, profit_curve[0])
         chart.line(profit_curve[1], color='blue')
-        chart.to_png(os.path.join(dirpath, 'profit.png'))    
+        if save:
+            chart.to_png(os.path.join(dirpath, 'profit.png'))    
+        if plot:
+            show(chart.fig)
         return df
     
     
@@ -232,7 +220,7 @@ def plot_markers(fig, time, df):
     price_entry = df['entry_price'].to_list()
     price_exit = df['exit_price'].to_list()
     loscut = df['losscuted'].to_list()
-    for s, t0, t1, p0, p1, ls in zip(signal, t_entry, t_exit, price_entry, price_exit, loscut):
+    for s, t0, t1, p0, p1, lc in zip(signal, t_entry, t_exit, price_entry, price_exit, loscut):
         if t1 >= time[0] and t1 <= time[-1]:
             if s == 1:
                 marker = '^'
@@ -241,20 +229,18 @@ def plot_markers(fig, time, df):
                 marker = 'v'
                 color = 'red'
             fig.marker(t0, p0, marker=marker, color=color, alpha=0.5, size=20)
-            marker = 'x' if ls else '*'
+            marker = 'x' if lc == 'true' else '*'
             fig.marker(t1, p1, marker=marker, color='gray', alpha=0.7, size=30)
     
         
-def main(symbol, timeframe):
+def main(symbol, timeframe, save=True, plot=True):
     days = 20
     backtest = Backtest(symbol, timeframe)
     root = f'./evaluate/{symbol}/{timeframe}'
     os.makedirs(root, exist_ok=True)
-    df = backtest.evaluate(root)
-    
+    df = backtest.evaluate(root, plot=(not plot))
     data0 = backtest.data
     time = data0[Columns.JST]
-    
     tbegin = time[0]
     tend = time[-1]
     
@@ -267,14 +253,16 @@ def main(symbol, timeframe):
     while t1 <= tend:
         if n > 50:
             l = create_fig(data, df) 
-            export_png(l, filename=os.path.join(dirpath, f'{count}.png'))  
-            show(l)
+            if save:
+                export_png(l, filename=os.path.join(dirpath, f'{count}.png'))  
+            if plot:
+                show(l)
             count += 1
         t0 = t1
         t1 = t0 + timedelta(days=days)
         n, data = TimeUtils.slice(data0, Columns.JST, t0, t1)
    
-def debug(symbol, timeframe):
+def debug(symbol, timeframe, save=True, plot=True):
     days = 10
     backtest = Backtest(symbol, timeframe)
     root = f'./debug/{symbol}/{timeframe}'
@@ -292,13 +280,16 @@ def debug(symbol, timeframe):
     backtest.data = data    
     df = backtest.evaluate(root)
     l = create_fig(data, df) 
-    export_png(l, filename=os.path.join(root, '0.png'))  
-    show(l)
+    if save:
+        export_png(l, filename=os.path.join(root, '0.png'))  
+    if plot:
+        show(l)
     
     dirpath = os.path.join(root, 'chart')
     os.makedirs(dirpath, exist_ok=True)   
     df2 = pd.DataFrame(data)
-    df2.to_csv(os.path.join(root, 'data.csv'))
+    if save:
+        df2.to_csv(os.path.join(root, 'data.csv'))
     return l
      
 def analyze(data):
@@ -378,4 +369,4 @@ def create_fig(data, df):
                 
     
 if __name__ == '__main__':
-    debug('NIKKEI', 'M15')
+    debug('NIKKEI', 'H1')

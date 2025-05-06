@@ -196,8 +196,8 @@ class Positions:
 class Simulation:
     SL_NONE = 0
     SL_FIX = 1
-    SL_HIGH_LOW = 2
-    SL_ADAPTIVE = 3
+    SL_RANGE = 2
+    SL_DATA = 3
     
     def __init__(self, data, trade_param:dict):
         self.data = data
@@ -205,6 +205,7 @@ class Simulation:
         self.strategy = self.trade_param['strategy'].upper()
         self.volume = trade_param['volume']
         self.position_num_max = trade_param['position_max']
+        self.sl_method = self.trade_param['sl_method']
         self.sl_value = self.trade_param['sl_value']
         self.last_entry_price = None
         self.last_entry_signal = None
@@ -220,7 +221,41 @@ class Simulation:
             self.timefilter = None                
         self.positions = Positions(self.timefilter)
         
-    def run(self, data, entry_signal, exit_signal, sl_long_signal, sl_short_signal):
+    def calc_sl(self, signal, index, sl_method, sl_value, data):
+        if sl_method == self.SL_NONE:
+            return None
+        op = data[Columns.OPEN]
+        hi = data[Columns.HIGH]
+        lo = data[Columns.LOW]
+        cl = data[Columns.CLOSE]
+        if sl_method == self.SL_FIX:
+            [value] = sl_value
+            if signal == Signal.LONG:
+                sl = cl[index] - value
+            elif signal == Signal.SHORT:
+                sl = cl[index] + value 
+        elif sl_method == self.SL_RANGE:
+            [length, value] = sl_value
+            i0 = index - length + 1
+            if i0 < 0:
+                i0 = 0
+            if signal == Signal.LONG:
+                d = lo[i0: index + 1]
+                sl = min(d) - value
+            elif signal == Signal.SHORT:
+                d = hi[i0: index + 1]
+                sl = max(d) + value
+        elif sl_method == self.SL_DATA:
+            [column] = sl_value
+            stop_signal = data[column]
+            value = stop_signal[index]
+            if signal == Signal.LONG:
+                sl = cl[index] - value
+            elif signal == Signal.SHORT:
+                sl = cl[index] + value             
+        return sl
+        
+    def run(self, data, entry_signal, exit_signal):
         self.data = data
         time = data[Columns.JST]
         op = data[Columns.OPEN]
@@ -240,18 +275,7 @@ class Simulation:
             if ext[i] != 0:
                 self.positions.exit_all_signal(None, i, time[i], cl[i])
             if entry[i] != 0:
-                if entry[i] == Signal.LONG:
-                    sl = cl[i] - self.sl_value
-                    if sl_long_signal is not None:
-                        sl_long = data[sl_long_signal]
-                        if sl_long[i] > sl:
-                            sl = sl_long[i]
-                elif entry[i] == Signal.SHORT:
-                    sl = cl[i] + self.sl_value
-                    if sl_short_signal is not None:
-                        sl_short = data[sl_short_signal]
-                        if sl_short[i] < sl:
-                            sl = sl_short[i]
+                sl = self.calc_sl(entry[i], i, self.sl_method, self.sl_value, data)
                 self.entry(entry[i], i, time[i], cl[i], sl)
         summary, profit_curve = self.positions.summary()
         return self.positions.to_dataFrame(self.strategy), summary, profit_curve

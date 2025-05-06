@@ -1019,7 +1019,7 @@ def SUPERTREND(data: dict,  atr_window: int, multiply):
     data[Columns.HL2] = price
     n = len(time)
     atr = calc_atr(data, atr_window)
-    ATRP(data, atr_window, atr_window)
+    #ATRP(data, atr_window, atr_window)
     atr_u, atr_l = band(price, atr, multiply)
     data[Indicators.ATR_UPPER] = atr_u
     data[Indicators.ATR_LOWER] = atr_l

@@ -27,8 +27,8 @@ from streamlit_autorefresh import st_autorefresh
 is_first_time = True
 
 SYMBOLS = ['NIKKEI', 'DOW', 'NSDQ', 'SP', 'HK50', 'XAUUSD', 'USDJPY']
-TIMEFRAMES = ['M5', 'M1', 'M15', 'M30', 'H1', 'H4', 'D1']
-DATA_LENGTH = [200, 100, 300, 400, 500, 800, 1000]
+TIMEFRAMES = ['H1', 'M15', 'M30' 'H4', 'D1']
+DATA_LENGTH = [300, 100, 200, 400, 500, 800, 1000]
 UPDATE_COUNT = [5, 7, 10, 20]
 DROP_RATE = [0.05, 0.1, 0.15, 0.2, 0.25, 0.3, 0.4, 0.5]
 LENGTH_MARGIN = 400
@@ -38,10 +38,10 @@ def calc_indicators(timeframe, data, technical_params):
     rally(data, long_term= p['ma_long_period'])
     SUPERTREND(data, p['atr_period'], p['atr_multiply'])
     ANKO(data, p['update_count'], p['profit_ma_period'], p['profit_target'], p['profit_drop'])
-    
-def calc_indicators2(timeframe, data, technical_params):
-    w = technical_params['atr_window']
+    w = p['atrp_period']
     ATRP(data, w, w)
+    
+
     
 class Mt5Manager:
     def __init__(self, mt5, symbol, timeframe):
@@ -88,19 +88,16 @@ class DataLoader(threading.Thread):
         self.conditions = None
     
     def get_price(self, remove_last=False):
-        out = {}
+        out = []
         if self.conditions is None:
             return out
-        for symbol, dic in self.conditions.items():
-            d = {}
-            for timeframe, [indicator_function, param, length, length_margin] in dic.items():
-                df = self.mt5.get_rates(symbol, timeframe, length + length_margin)
-                if remove_last:
-                    df = df.iloc[:-1, :]
-                buffer = DataBuffer(symbol, timeframe, length, df, indicator_function, param, self.server_time_delta())
-                d[timeframe] = buffer.data
-                del df
-            out[symbol] = d
+        for symbol, timeframe, indicator_function, param, length, length_margin in self.conditions:
+            df = self.mt5.get_rates(symbol, timeframe, length + length_margin)
+            if remove_last:
+                df = df.iloc[:-1, :]
+            buffer = DataBuffer(symbol, timeframe, length, df, indicator_function, param, self.server_time_delta())
+            out.append([symbol, timeframe, buffer.data])
+            del df
         return out
     
     def run(self):
@@ -193,8 +190,12 @@ class Dashboard:
         lo = data[Columns.LOW]
         cl = data[Columns.CLOSE]
         chart1 = CandleChart(f'{self.symbol} {self.timeframe}', None, 400, time)
-        rally = data[Indicators.RALLY]
-        chart1.plot_background(rally, ['green', 'red'])
+        try:
+            rally = data[Indicators.RALLY]
+            chart1.plot_background(rally, ['green', 'red'])
+        except:
+            pass
+        
         chart1.plot_candle(op, hi, lo, cl)
         #chart1.line(data[Indicators.MA_SHORT], color='red', alpha=0.5)
         #chart1.line(data[Indicators.MA_MID], color='green', alpha=0.5)
@@ -245,6 +246,12 @@ class Dashboard:
         return l #chart1.fig
     
                             
+    def pickup_data(self, data, symbol, timeframe):
+        for symb, tf, d in data:
+            if symb == symbol and tf == timeframe:
+                return d
+        return None
+                            
     def run(self):
         global is_first_time
         is_first_time = True
@@ -257,24 +264,24 @@ class Dashboard:
                         'atr_period': self.atr_period,
                         'atr_multiply': self.atr_multiply,
                         'update_count': self.update_count,
+                        'atrp_period': 40,
                         'profit_ma_period': self.profit_ma_period,
                         'profit_target': self.profit_target,
                         'profit_drop': self.profit_drop}
             
-            c = {self.timeframe: [calc_indicators, param, self.length, LENGTH_MARGIN],
-                 'H1': [calc_indicators2, {'atr_window': 40}, self.length, LENGTH_MARGIN]}
-            
-            
-            conditions = {self.symbol:c}
-            st.session_state.DataLoader.setup(conditions)    
+            c = [[self.symbol, self.timeframe, calc_indicators, param, self.length, LENGTH_MARGIN]]
+            if self.timeframe != 'H1':
+                c.append([self.symbol, 'H1', calc_indicators, {'atr_window': 40}, self.length, LENGTH_MARGIN])            
+            st.session_state.DataLoader.setup(c)    
             self.loop = True    
         while self.loop:            
-            dic = st.session_state.DataLoader.data
+            d = st.session_state.DataLoader.data
             try:
-                data = dic[self.symbol][self.timeframe]
-                data_atr = dic[self.symbol]['H1']
+                data = self.pickup_data(d, self.symbol, self.timeframe)
+                data_atr = self.pickup_data(d, self.symbol, 'H1')
                 container = self.create_fig(data, data_atr)
-                self.placeholder.bokeh_chart(container)
+                if container is not None:
+                    self.placeholder.bokeh_chart(container)
             except Exception as e:
                 print(e)
             time.sleep(1)
