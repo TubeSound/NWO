@@ -21,7 +21,7 @@ JST = tz.gettz('Asia/Tokyo')
 UTC = tz.gettz('utc')
 
 from common import Indicators, Columns, Signal
-from technical import SUPERTREND, ANKO, rally
+from technical import SUPERTREND, ANKO, rally, sma
 from strategy import Simulation
 from time_utils import TimeFilter, TimeUtils
 from data_loader import DataLoader
@@ -160,14 +160,31 @@ def make_trade_param(sl_method, sl):
     return param
 
 
-def randomize_trade_param():
+def randomize_trade_param(symbol):
+    if symbol == 'NIKKEI' or symbol == 'DOW':
+        begin = 50
+        end = 500
+        step = 25
+    elif symbol == 'XAUUSD':
+        begin = 5
+        end = 100
+        step = 5
+    elif symbol == 'USDJPY':
+        begin = 0.2
+        end = 2.0
+        step = 0.2
+    elif symbol == 'NSDQ':
+        begin = 10
+        end = 100
+        step = 10
+    
     param =  {
                 'strategy': 'anko',
                 'begin_hour': 0,
                 'begin_minute': 0,
                 'hours': 0,
                 'sl_method': Simulation.SL_FIX,
-                'sl_value': [rand_step(50, 500, 25)],
+                'sl_value': [rand_step(begin, end, step)],
                 'trail_target':0,
                 'trail_stop': 0, 
                 'volume': 0.1, 
@@ -210,24 +227,75 @@ class Backtest():
         self.symbol = symbol
         self.timeframe = timeframe
         self.data = self.from_pickle(symbol, timeframe)
+        self.jst = self.data[Columns.JST]
                 
     def from_pickle(self, symbol, timeframe):
         filepath = './data/Axiory/' + symbol + '_' + timeframe + '.pkl'
         with open(filepath, 'rb') as f:
             data0 = pickle.load(f)
         return data0                
+    
+    def set_time(self, tbegin, tend):
+        if tend is None:
+            tend = self.jst[-1]
+        n, data = TimeUtils.slice(self.data, Columns.JST, tbegin, tend)   
+        if n > 0:
+            self.data = data
+            self.jst = self.data[Columns.JST]
+    
+    
+    def calc_drawdown(self, profit_data, window=5):
+        def search_upper(data, ibegin, value):
+            n = len(data)
+            for i in range(ibegin, n): 
+                if data[i] > value:
+                    return i
+            return -1     
+
+        def calc_down(data, index, j):
+            d = data[index: j]
+            imin = np.argmin(d)
+            return imin + index
+            
+        time = profit_data[0]
+        profits = profit_data[1]
+        ma = sma(profits, window)
+        n = len(time)
+        drawdowns = []
+        sum_drawdown = 0
+        begin_value = None
+        ibegin = None
+        i = window
+        while i <  n - 1:
+            if ma[i] < ma[i - 1]:
+                begin_value = ma[i]
+                ibegin = i
+                iend = search_upper(ma, ibegin, begin_value)
+                if iend >= 0:
+                    ilow = calc_down(ma, ibegin, iend)
+                    drawdowns.append([ibegin, begin_value, ilow, ma[ilow], iend, ma[iend]])
+                    sum_drawdown += (ma[ilow] - begin_value)
+                    i = iend + 1
+                else:
+                    ilow = calc_down(ma, ibegin, n - 1)
+                    drawdowns.append([ibegin, begin_value, ilow, ma[ilow], n - 1, ma[-1]])
+                    sum_drawdown += (ma[ilow] - begin_value)
+                    break
+            i += 1
+        return drawdowns, sum_drawdown
         
 
     def trade(self, data, trade_param):
         sim = Simulation(data, trade_param)        
         ret = sim.run(data, Indicators.ANKO_ENTRY, Indicators.ANKO_EXIT)
         df, summary, profit_curve = ret
+        _, drawdown = self.calc_drawdown(profit_curve)
         trade_num, profit, win_rate = summary
-        return (df, summary, profit_curve)
+        return (df, summary, drawdown, profit_curve)
         
     def evaluate(self, technical_param, trade_param, dirpath, save=True, plot=True):
         calc_indicators(self.timeframe, self.data, technical_param)
-        (df, summary, profit_curve) = self.trade(self.data, trade_param)
+        (df, summary, drawdown, profit_curve) = self.trade(self.data, trade_param)
         trade_num, profit, win_rate = summary
         #print(summary)
         df.to_csv(os.path.join(dirpath, 'trade_summary.csv'), index=False)
@@ -238,7 +306,7 @@ class Backtest():
             chart.to_png(os.path.join(dirpath, 'profit.png'))    
         if plot:
             show(chart.fig)
-        return (df, summary, profit_curve, chart) 
+        return (df, summary, drawdown, profit_curve, chart) 
     
     
     
@@ -303,16 +371,18 @@ def main(symbol, timeframe, save=True, plot=True):
 def optimize(symbol, timeframe, loop=200):
     root = f'./optimize/sl_fix/{symbol}/{timeframe}'
     os.makedirs(root, exist_ok=True)
+    png_dir = os.path.join(root, 'profit')
+    os.makedirs(png_dir, exist_ok=True)
     data = []
     for i in range(loop):
         backtest = Backtest(symbol, timeframe)
-        trade_param = randomize_trade_param()
+        trade_param = randomize_trade_param(symbol)
         technical_param = randomize_technical_param()
-        (df, summary, profit_curve, chart_profit) = backtest.evaluate(technical_param, trade_param, root, plot=False)
+        (df, summary, drawdown, profit_curve, chart_profit) = backtest.evaluate(technical_param, trade_param, root, plot=False)
         trade_num, profit, win_rate = summary
-        p = [i, trade_num, profit, win_rate]
+        p = [i, trade_num, profit, drawdown, win_rate]
         print(i, profit)
-        columns = ['index', 'num', 'profit', 'win_rate']
+        columns = ['no', 'num', 'profit', 'drawdown', 'win_rate']
         p0, c0 = expand('tech', technical_param) 
         p1, c1 = expand('trade', trade_param)
         p += p0
@@ -321,15 +391,93 @@ def optimize(symbol, timeframe, loop=200):
         columns += c0
         columns += c1
         try:
-            df_summary = pd.DataFrame(data=p, columns=columns)
+            df_summary = pd.DataFrame(data=data, columns=columns)
             df_summary.to_excel(os.path.join(root, f'summary.xlsx'))
         except:
             pass
-        if profit > 8000:
-            chart_profit.to_png(os.path.join(root, 'profit.png'))    
+        if profit > 30:
+            chart_profit.to_png(os.path.join(png_dir, f'{i:04}_profit.png'))    
 
 
+def select_top(array, index, top):
+    n = len(array)
+    if n <= top:
+        return array
+    else:
+        return sorted(array, key=lambda x: x[index], reverse=True)[:top]
+        
+def optimize2stage(symbol, timeframe, repeat=1000, top=50):
+    dirpath = f'./optimize2stage_2025_01/sl_fix/{symbol}/{timeframe}'
+    os.makedirs(dirpath, exist_ok=True)
+    png_dir = os.path.join(dirpath, 'profit')
+    os.makedirs(png_dir, exist_ok=True)
+    tbegin = datetime(2025, 1, 1).astimezone(JST)
+    columns = None
+    result = []
+    for i in range(repeat):
+        backtest = Backtest(symbol, timeframe)
+        backtest.set_time(tbegin, None)
+        trade_param = randomize_trade_param(symbol)
+        technical_param = randomize_technical_param()
+        (df, summary, drawdown, profit_curve, chart_profit) = backtest.evaluate(technical_param, trade_param, dirpath, plot=False)
+        trade_num, profit, win_rate = summary
+        p = [i, profit, drawdown, technical_param, trade_param]
+        print(i, profit, drawdown)
+        result.append(p)
+    
+    selected = select_top(result, 1, top) 
+    
+    data = []
+    columns = None
+    for i, (_,  profit, drawdown, technical_param, trade_param) in enumerate(selected):
+        backtest = Backtest(symbol, timeframe)
+        (df, summary, drawdown, profit_curve, chart_profit) = backtest.evaluate(technical_param, trade_param, dirpath, plot=False)
+        trade_num, profit, win_rate = summary
+        if profit > 0:
+            chart_profit.to_png(os.path.join(png_dir, f'{i:04}_{symbol}_{timeframe}_profit.png'))    
 
+        p = [i, trade_num, profit, drawdown, win_rate]
+        p0, c0 = expand('', technical_param) 
+        p1, c1 = expand('', trade_param)
+        p += p0
+        p += p1
+        data.append(p)
+        if columns is None:
+            columns = ['no', 'num', 'profit', 'drawdown', 'win_rate']
+            columns += c0
+            columns += c1
+    df_summary = pd.DataFrame(data=data, columns=columns)
+    df_best = select_best_param(df_summary)
+    df_summary.sort_values(by='profit', ascending=False)
+    df_summary.to_csv(os.path.join(dirpath, f'{symbol}_{timeframe}_trade_param.csv'), index=False)
+        
+        
+def select_best_param(df0):
+    def rotate(point, center, angle):
+        x = (point[0] - center[0]) * math.cos(angle) - (point[1] - center[1]) * math.sin(angle) + center[0]
+        y = (point[1] - center[1]) * math.cos(angle) + (point[0] - center[0]) * math.sin(angle) + center[1]
+        return (x, y)
+    
+    df = df0[df0['profit'] > 0]
+    print(df.columns)
+    no = df['no'].to_numpy()
+    profit = df['profit'].to_numpy()
+    drawdown = df['drawdown'].to_numpy()
+    p0 = [min(profit), min(drawdown)]
+    p1 = [max(profit), max(drawdown)]
+    center = [(p0[0] + p1[0]) / 2, (p0[1] + p1[1]) / 2] 
+    vector = np.array(p1) - np.array(p0)
+    angle = np.arctan2(vector[0], vector[1])
+    xs = []
+    ys = []
+    for p, d in zip(profit, drawdown):
+        x, y = rotate((p, d), center, -angle)
+        xs.append(x)
+        ys.append(y)
+    imax = np.argmax(xs)
+    print(no[imax], profit[imax], drawdown[imax])
+    return df[df['no'] == no[imax]]
+     
 
    
 def debug(symbol, timeframe, save=True, plot=True):
@@ -441,4 +589,4 @@ def create_fig(data, df):
     return l #chart1.fig
     
 if __name__ == '__main__':
-    optimize('NIKKEI', 'H1')
+    optimize2stage('XAUUSD', 'M5')

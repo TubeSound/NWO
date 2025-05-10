@@ -26,12 +26,30 @@ from streamlit_autorefresh import st_autorefresh
 # 5秒ごとにリロード
 is_first_time = True
 
-SYMBOLS = ['NIKKEI', 'DOW', 'NSDQ', 'SP', 'HK50', 'XAUUSD', 'USDJPY']
-TIMEFRAMES = ['H1', 'M15', 'M30' 'H4', 'D1']
-DATA_LENGTH = [300, 100, 200, 400, 500, 800, 1000]
-UPDATE_COUNT = [5, 7, 10, 20]
-DROP_RATE = [0.05, 0.1, 0.15, 0.2, 0.25, 0.3, 0.4, 0.5]
+P_SYMBOLS = ['NIKKEI', 'DOW', 'NSDQ', 'SP', 'HK50', 'XAUUSD', 'USDJPY']
+P_TIMEFRAMES = ['H1', 'M5', 'M15', 'M30', 'H4', 'D1']
+P_MA_LONG_PERIOD = [20, 30, 40, 50, 60, 80, 100]
+P_DATA_LENGTH = [300, 100, 200, 400, 500, 800, 1000]
+P_ATR_PERIOD = [5, 10, 15, 20, 25, 30, 40, 50]
+P_ATR_MULTIPLY = [1.0, 1.5, 2.0, 3.0, 3.5, 4.0]
+P_UPDATE_COUNT = [1, 2, 3, 4, 5, 7, 10, 20]
+
+
 LENGTH_MARGIN = 400
+
+UPDATE_COUNT = 'update_count'
+MA_LONG_PERIOD= 'ma_long_period'
+ATR_PERIOD = 'atr_period'
+ATR_MULTIPLY = 'atr_multiply'
+SL = 'sl'
+
+PARAM = {
+            'NSDQ':  {'M15': {MA_LONG_PERIOD: 40, ATR_PERIOD: 15, ATR_MULTIPLY: 3.0, UPDATE_COUNT: 4, SL: 90}},
+            'XAUUSD':  {'M30': {MA_LONG_PERIOD: 65, ATR_PERIOD: 5, ATR_MULTIPLY: 3.0, UPDATE_COUNT: 3, SL: 90}},
+         }
+DEFAULT = {MA_LONG_PERIOD: 40, ATR_PERIOD: 10, ATR_MULTIPLY: 3.0, UPDATE_COUNT: 5, SL: 70}
+
+
 
 def calc_indicators(timeframe, data, technical_params):
     p = technical_params
@@ -134,15 +152,23 @@ class Dashboard:
         self.mt5.connect()
         
     def set_param(self):
-        self.symbol = st.sidebar.selectbox('Symbol', SYMBOLS)
-        self.timeframe = st.sidebar.selectbox('Timeframe', TIMEFRAMES)
-        self.length = st.sidebar.selectbox('Length', DATA_LENGTH)
-        self.ma_long_period = st.sidebar.selectbox('MA Long period', [40, 20, 60, 100])
-        self.atr_period = st.sidebar.selectbox('ATR period', [10, 15, 20, 25, 30])
-        self.atr_multiply = st.sidebar.selectbox('ATR multiply', [3.0, 1.0, 1.5, 2.5, 3.0, 3.5, 4.0])
-        self.update_count = st.sidebar.selectbox('Update count', UPDATE_COUNT)
-        self.profit_ma_period = st.sidebar.selectbox('Profit MA period', [5, 3, 7, 10, 20])
-        
+        self.symbol = st.sidebar.selectbox('Symbol', P_SYMBOLS)
+        self.timeframe = st.sidebar.selectbox('Timeframe', P_TIMEFRAMES)
+        self.length = st.sidebar.selectbox('Length', P_DATA_LENGTH)
+        self.profit_ma_period = 20
+        try:
+            param = PARAM[self.symbol][self.timeframe]
+        except:
+            param = DEFAULT
+        ma_long_period = [param[MA_LONG_PERIOD]] + P_MA_LONG_PERIOD
+        atr_period = [param[ATR_PERIOD]] + P_ATR_PERIOD
+        atr_multiply = [param[ATR_MULTIPLY]] + P_ATR_MULTIPLY
+        update_count = [param[UPDATE_COUNT]] + P_UPDATE_COUNT
+        with st.sidebar: 
+            self.ma_long_period = st.sidebar.selectbox("MA Long Period", ma_long_period)
+            self.atr_period = st.sidebar.selectbox("ATR Period", atr_period)
+            self.atr_multiply = st.sidebar.selectbox("ATR Multiply", atr_multiply)   
+            self.update_count = st.sidebar.selectbox("Update Count", update_count)
         self.profit_target = [50, 100, 200, 300, 400]
         self.profit_drop   = [25, 50,   50, 100, 200]
         
@@ -233,10 +259,10 @@ class Dashboard:
         chart2.fig.legend.location = 'top_left'
         chart2.fig.x_range = chart1.fig.x_range
         
-        atrp1h = self.expand(time, data2[Columns.JST], data2[Indicators.ATRP])
-        chart3 = TimeChart('ATRP', None, 200, time)
-        chart3.line(data[Indicators.ATRP],  color='blue', alpha=0.5, line_width=3.0, legend_label='ATRP')
-        chart3.line(atrp1h,  color='red', alpha=0.5, line_width=3.0, legend_label='ATRP H1')
+        atr1h = self.expand(time, data2[Columns.JST], data2[Indicators.ATR])
+        chart3 = TimeChart('ATR', None, 200, time)
+        chart3.line(data[Indicators.ATR],  color='blue', alpha=0.5, line_width=3.0, legend_label='ATR')
+        chart3.line(atr1h,  color='red', alpha=0.5, line_width=3.0, legend_label='ATR H1')
         chart3.hline(0.0, 'black')
         chart3.fig.legend.location = 'top_left'
         chart3.fig.x_range = chart1.fig.x_range
@@ -271,7 +297,7 @@ class Dashboard:
             
             c = [[self.symbol, self.timeframe, calc_indicators, param, self.length, LENGTH_MARGIN]]
             if self.timeframe != 'H1':
-                c.append([self.symbol, 'H1', calc_indicators, {'atr_window': 40}, self.length, LENGTH_MARGIN])            
+                c.append([self.symbol, 'H1', calc_indicators, param, self.length, LENGTH_MARGIN])            
             st.session_state.DataLoader.setup(c)    
             self.loop = True    
         while self.loop:            

@@ -32,7 +32,7 @@ def download(symbols, save_holder):
     for symbol in symbols:
         for tf in [TimeFrame.M5, TimeFrame.M15, TimeFrame.M30, TimeFrame.H1, TimeFrame.H4, TimeFrame.D1, TimeFrame.M1]:
             for year in range(2025, 2026):
-                for month in range(4, 5):
+                for month in range(5, 6):
                     t0 = datetime(year, month, 1, 0)
                     t0 = t0.replace(tzinfo=JST)
                     t1 = t0 + relativedelta(months=1) - timedelta(seconds=1)
@@ -90,10 +90,10 @@ def save_data():
     year_from = 2020
     month_from = 1
     year_to = 2025
-    month_to = 4
+    month_to = 5
     loader = DataLoader()
     for symbol in all_symbols():
-        if symbol in ['TSLA', 'NVDA', 'NIKKEI', 'NSDQ']:
+        if symbol in ['TSLA', 'NVDA', 'NIKKEI', 'NSDQ', 'XAUUSD']:
             tfs = ['M1', 'M5', 'M15', 'M30', 'H1', 'H4', 'D1']
         else:
             tfs = ['M15' , 'M30', 'H1', 'H4', 'D1']
@@ -103,7 +103,7 @@ def save_data():
             save('./data/Axiory/' + symbol + '_' + tf + ".pkl", data)
     
 def main():
-    dl1()
+    #dl1()
     save_data()
     from analyze_atrp import main5
     main5()
