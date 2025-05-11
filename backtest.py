@@ -26,7 +26,7 @@ from strategy import Simulation
 from time_utils import TimeFilter, TimeUtils
 from data_loader import DataLoader
 import random
-from dashboard_market import calc_indicators
+from dashboard_market import calc_indicators, calc_atrp, expand_time
 
 def makeFig(rows, cols, size):
     fig, ax = plt.subplots(rows, cols, figsize=(size[0], size[1]))
@@ -169,7 +169,7 @@ def randomize_trade_param(symbol):
         begin = 5
         end = 100
         step = 5
-    elif symbol == 'USDJPY':
+    elif symbol == 'USDJPY' or symbol == 'GBPJPY':
         begin = 0.2
         end = 2.0
         step = 0.2
@@ -177,7 +177,7 @@ def randomize_trade_param(symbol):
         begin = 10
         end = 100
         step = 10
-    
+
     param =  {
                 'strategy': 'anko',
                 'begin_hour': 0,
@@ -211,7 +211,7 @@ def randomize_technical_param():
             'ma_long_period': rand_step(20, 80, 5),
             'atr_period': rand_step(5, 20, 5),
             'atr_multiply': rand_step(1, 4, 0.5),
-            'update_count': rand_step(1, 10, 1),
+            'update_count': rand_step(0, 30, 2),
             'atrp_period': 40,
             'profit_ma_period': 5,
             'profit_target': [50, 100, 200, 300, 400],
@@ -227,6 +227,10 @@ class Backtest():
         self.symbol = symbol
         self.timeframe = timeframe
         self.data = self.from_pickle(symbol, timeframe)
+        if timeframe != 'H1':
+            self.data_h1 = self.from_pickle(symbol, 'H1')
+        else:
+            self.data_h1 = None
         self.jst = self.data[Columns.JST]
                 
     def from_pickle(self, symbol, timeframe):
@@ -294,11 +298,24 @@ class Backtest():
         return (df, summary, drawdown, profit_curve)
         
     def evaluate(self, technical_param, trade_param, dirpath, save=True, plot=True):
-        calc_indicators(self.timeframe, self.data, technical_param)
+        calc_indicators(self.data, technical_param)
+        if self.data_h1 is not None:
+            calc_atrp(self.data_h1, technical_param)
+            atr_h1 = self.data_h1[Indicators.ATR]
+            atr_h1 = expand_time(self.data[Columns.JST], self.data_h1[Columns.JST], atr_h1)
+            atrp_h1 = self.data_h1[Indicators.ATRP]
+            atrp_h1 = expand_time(self.data[Columns.JST], self.data_h1[Columns.JST], atrp_h1)
+        else:
+            atr_h1 = self.data[Indicators.ATR]
+            atrp_h1 = self.data[Indicators.ATRP]
+        self.data[Indicators.ATR_H1] = atr_h1
+        self.data[Indicators.ATRP_H1] = atrp_h1
         (df, summary, drawdown, profit_curve) = self.trade(self.data, trade_param)
         trade_num, profit, win_rate = summary
         #print(summary)
         df.to_csv(os.path.join(dirpath, 'trade_summary.csv'), index=False)
+        if len(profit_curve[0]) < 2:
+            return df, summary, drawdown, profit_curve, None
         title = f'[ANKO] {self.symbol} {self.timeframe} Total Profit: {profit} n: {trade_num} win: {win_rate * 100}%'
         chart = TimeChart(title, 800, 400, profit_curve[0])
         chart.line(profit_curve[1], color='blue')
@@ -589,4 +606,4 @@ def create_fig(data, df):
     return l #chart1.fig
     
 if __name__ == '__main__':
-    optimize2stage('XAUUSD', 'M5')
+    optimize2stage('GBPJPY', 'H1')

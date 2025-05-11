@@ -29,7 +29,7 @@ is_first_time = True
 P_SYMBOLS = ['NIKKEI', 'DOW', 'NSDQ', 'SP', 'HK50', 'XAUUSD', 'USDJPY']
 P_TIMEFRAMES = ['H1', 'M5', 'M15', 'M30', 'H4', 'D1']
 P_MA_LONG_PERIOD = [20, 30, 40, 50, 60, 80, 100]
-P_DATA_LENGTH = [300, 100, 200, 400, 500, 800, 1000]
+P_DATA_LENGTH = [300, 100, 200, 400, 500, 800, 1000, 1500, 2000, 3000, 4000]
 P_ATR_PERIOD = [5, 10, 15, 20, 25, 30, 40, 50]
 P_ATR_MULTIPLY = [1.0, 1.5, 2.0, 3.0, 3.5, 4.0]
 P_UPDATE_COUNT = [1, 2, 3, 4, 5, 7, 10, 20]
@@ -45,13 +45,16 @@ SL = 'sl'
 
 PARAM = {
             'NSDQ':  {'M15': {MA_LONG_PERIOD: 40, ATR_PERIOD: 15, ATR_MULTIPLY: 3.0, UPDATE_COUNT: 4, SL: 90}},
+            'NSDQ':  {'M30': {MA_LONG_PERIOD: 35, ATR_PERIOD: 10, ATR_MULTIPLY: 1.5, UPDATE_COUNT: 3, SL: 90}},
+            'NSDQ':  {'H1': {MA_LONG_PERIOD: 70, ATR_PERIOD: 20, ATR_MULTIPLY: 1.0, UPDATE_COUNT: 3, SL: 50}},
             'XAUUSD':  {'M30': {MA_LONG_PERIOD: 65, ATR_PERIOD: 5, ATR_MULTIPLY: 3.0, UPDATE_COUNT: 3, SL: 90}},
+            'XAUUSD':  {'H1': {MA_LONG_PERIOD: 55, ATR_PERIOD: 5, ATR_MULTIPLY: 2.0, UPDATE_COUNT: 1, SL: 95}},
          }
 DEFAULT = {MA_LONG_PERIOD: 40, ATR_PERIOD: 10, ATR_MULTIPLY: 3.0, UPDATE_COUNT: 5, SL: 70}
 
 
 
-def calc_indicators(timeframe, data, technical_params):
+def calc_indicators(data, technical_params):
     p = technical_params
     rally(data, long_term= p['ma_long_period'])
     SUPERTREND(data, p['atr_period'], p['atr_multiply'])
@@ -59,7 +62,30 @@ def calc_indicators(timeframe, data, technical_params):
     w = p['atrp_period']
     ATRP(data, w, w)
     
-
+def calc_atrp(data, technical_params):
+    p = technical_params
+    w = p['atrp_period']
+    ATRP(data, w, w)
+    
+def expand_time(time, time1h, atr1h):
+    n = len(time)
+    atr = np.full(n, np.nan)
+    last = -1
+    for t_h1, a in zip(time1h, atr1h):
+        if t_h1 < time[0]:
+            continue
+        for i in range(last + 1, len(time)):
+            if time[i] == t_h1:
+                atr[i] = a
+                last = i
+                break
+                
+    for i in range(1, n):
+        if np.isnan(atr[i]):
+            if not np.isnan(atr[i - 1]):
+                atr[i] = atr[i - 1]                
+    return atr
+           
     
 class Mt5Manager:
     def __init__(self, mt5, symbol, timeframe):
@@ -169,6 +195,7 @@ class Dashboard:
             self.atr_period = st.sidebar.selectbox("ATR Period", atr_period)
             self.atr_multiply = st.sidebar.selectbox("ATR Multiply", atr_multiply)   
             self.update_count = st.sidebar.selectbox("Update Count", update_count)
+            self.plot_marker = st.checkbox('マーカー表示', value=False)
         self.profit_target = [50, 100, 200, 300, 400]
         self.profit_drop   = [25, 50,   50, 100, 200]
         
@@ -195,32 +222,36 @@ class Dashboard:
         r3 = float(int(r2 + 0.5)) * rate
         return r3
         
-    def expand(self, time, time1h, atr1h):
-        n = len(time)
-        atr = np.full(n, np.nan)
-        for t1h, a in zip(time1h, atr1h):
-            for i, t in enumerate(time):
-                if t == t1h:
-                    atr[i] = a
-                    break
-        for i in range(1, n):
-            if np.isnan(atr[i]):
-                if not np.isnan(atr[i - 1]):
-                    atr[i] = atr[i - 1]                
-        return atr
+
         
-    def create_fig(self, data, data2):
+    def calc_profit(self, profits):
+        begin = None
+        prof = []
+        for i, p in enumerate(profits):
+            if begin is None:
+                if not np.isnan(p):
+                    begin = i
+            else:
+                if np.isnan(p):
+                    prof.append(profits[i - 1])
+                    begin = None
+        return len(prof), sum(prof)
+        
+    def create_fig(self, data, data2, plot_marker=True):
         time = data[Columns.JST]
         op = data[Columns.OPEN]
         hi = data[Columns.HIGH]
         lo = data[Columns.LOW]
         cl = data[Columns.CLOSE]
-        chart1 = CandleChart(f'{self.symbol} {self.timeframe}', None, 400, time)
+        profits = data[Indicators.PROFITS]
+        trade_n, total_profit = self.calc_profit(profits)
+        chart1 = CandleChart(f'{self.symbol} {self.timeframe} trade n: {trade_n} profit: {total_profit:.3f}', None, 350, time)
         try:
             rally = data[Indicators.RALLY]
             chart1.plot_background(rally, ['green', 'red'])
         except:
             pass
+        
         
         chart1.plot_candle(op, hi, lo, cl)
         #chart1.line(data[Indicators.MA_SHORT], color='red', alpha=0.5)
@@ -233,12 +264,13 @@ class Dashboard:
         #chart1.markers(data[Indicators.SQUEEZER], cl, 1, marker='o', color='red', alpha=0.5, size=10)
         chart1.set_ylim(np.min(lo), np.max(hi), self.calc_range(lo, hi))
         
-        entry = data[Indicators.ANKO_ENTRY]
-        ext = data[Indicators.ANKO_EXIT]
-        chart1.markers(entry, cl, 1, marker='^', color='green', alpha=0.5, size=20)
-        chart1.markers(entry, cl, -1, marker='v', color='red', alpha=0.5, size=20)
-        chart1.markers(ext, cl, 1, marker='*', color='gray', alpha=0.6, size=30)
-        chart1.markers(ext, cl, -1, marker='*', color='red', alpha=0.6, size=30)
+        if plot_marker:
+            entry = data[Indicators.ANKO_ENTRY]
+            ext = data[Indicators.ANKO_EXIT]
+            chart1.markers(entry, cl, 1, marker='^', color='green', alpha=0.5, size=20)
+            chart1.markers(entry, cl, -1, marker='v', color='red', alpha=0.5, size=20)
+            chart1.markers(ext, cl, 1, marker='*', color='gray', alpha=0.6, size=30)
+            chart1.markers(ext, cl, -1, marker='*', color='red', alpha=0.6, size=30)
         r = 50
         if self.timeframe == 'H1' or self.timeframe == 'M30':
             r = 100
@@ -251,23 +283,33 @@ class Dashboard:
         chart1.hline(0.0, 'black', extra_axis=True)
         chart1.fig.legend.location = 'top_left'
         
-        chart2 = TimeChart('Profit', None, 200, time)
-        chart2.line(data[Indicators.PROFITS],  color='blue', alpha=0.5, line_width=3.0, legend_label='Profit')
-        chart2.line(data[Indicators.PROFITS_MA],  color='red', alpha=0.5, line_width=3.0, legend_label='Profit MA')
+        chart2 = TimeChart('Profit', None, 150, time)
+        chart2.line(profits,  color='blue', alpha=0.5, line_width=3.0, legend_label='Profit')
+        #chart2.line(data[Indicators.PROFITS_MA],  color='red', alpha=0.5, line_width=3.0, legend_label='Profit MA')
         chart2.markers(data[Indicators.PROFITS_PEAKS], data[Indicators.PROFITS], 1, marker='o', color='red', alpha=0.5, size=10)
         chart2.hline(0.0, 'black')
         chart2.fig.legend.location = 'top_left'
         chart2.fig.x_range = chart1.fig.x_range
         
-        atr1h = self.expand(time, data2[Columns.JST], data2[Indicators.ATR])
-        chart3 = TimeChart('ATR', None, 200, time)
+        atr1h = expand_time(time, data2[Columns.JST], data2[Indicators.ATR])
+        chart3 = TimeChart('ATR', None, 150, time)
         chart3.line(data[Indicators.ATR],  color='blue', alpha=0.5, line_width=3.0, legend_label='ATR')
         chart3.line(atr1h,  color='red', alpha=0.5, line_width=3.0, legend_label='ATR H1')
         chart3.hline(0.0, 'black')
         chart3.fig.legend.location = 'top_left'
         chart3.fig.x_range = chart1.fig.x_range
         
-        figs = [chart1.fig, chart2.fig, chart3.fig]
+        atrp1h = expand_time(time, data2[Columns.JST], data2[Indicators.ATRP])
+        chart4 = TimeChart('ATRP', None, 150, time)
+        chart4.line(data[Indicators.ATRP],  color='blue', alpha=0.5, line_width=3.0, legend_label='ATRP')
+        chart4.line(atrp1h,  color='red', alpha=0.5, line_width=3.0, legend_label='ATRP H1')
+        chart4.hline(0.0, 'black')
+        chart4.fig.legend.location = 'top_left'
+        chart4.fig.x_range = chart1.fig.x_range
+        chart4.set_ylim(0, 0.5, 0.5)
+        chart4.hline(0.25, 'yellow', width=2.0)
+        
+        figs = [chart1.fig, chart2.fig, chart3.fig, chart4.fig]
         l = column(*figs, sizing_mode='stretch_width', height=800, background='gray')
         return l #chart1.fig
     
@@ -305,7 +347,7 @@ class Dashboard:
             try:
                 data = self.pickup_data(d, self.symbol, self.timeframe)
                 data_atr = self.pickup_data(d, self.symbol, 'H1')
-                container = self.create_fig(data, data_atr)
+                container = self.create_fig(data, data_atr, plot_marker=self.plot_marker)
                 if container is not None:
                     self.placeholder.bokeh_chart(container)
             except Exception as e:

@@ -92,7 +92,7 @@ class DataBuffer:
         n, data = df2dic(df, Columns.TIME, COLUMNS, None, self.delta_hour_from_gmt)
         if n == 0:
             raise Exception('Error cannot get initail data')
-        indicator_function(timeframe, data, param)
+        indicator_function(data, param)
         data = Utils.sliceDictLast(data, length)
         self.data = data
         self.param = param
@@ -123,7 +123,7 @@ class DataBuffer:
                         value += nans(n)
                 except:
                     print(value)
-        self.function(self.timeframe, self.data, self.params)
+        self.function(self.data, self.params)
         return n
                 
                 

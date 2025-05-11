@@ -47,6 +47,12 @@ class TimeChart():
         self.time = time
         disp_time = time.copy()
         disp_time = list(disp_time)
+        if time is None:
+            self.indices = []
+            return
+        if len(time) < 2:
+            self.indices = []
+            return
         dt = time[-1] - time[-2]
         for i in range(1, 100):
             disp_time.append(time[-1] + i * dt)
@@ -67,6 +73,17 @@ class TimeChart():
             self.fig.extra_y_ranges = {self.Y_AXIS_2ND: DataRange1d(start=yrange[0], end=yrange[1])}
         axis = LinearAxis(y_range_name=self.Y_AXIS_2ND, axis_label=ylabel)
         self.fig.add_layout(axis,"right")
+        
+    def set_ylim(self, min, max, yrange):
+        r = max - min
+        if r > yrange:
+            upper = max
+            lower = max - yrange
+        else:
+            center = np.mean([min, max])
+            upper = center + yrange / 2
+            lower = center - yrange / 2
+        self.fig.y_range =  Range1d(lower, upper)
 
     def line(self, y, extra_axis=False, **kwargs):
         if extra_axis:
@@ -184,17 +201,7 @@ class CandleChart(TimeChart):
         self.max = np.nanmax(self.hi)
         if self.yrange is not None:
             self.set_ylim(self.min, self.max, self.yrange)
-            
-    def set_ylim(self, min, max, yrange):
-        r = max - min
-        if r > yrange:
-            upper = max
-            lower = max - yrange
-        else:
-            center = np.mean([min, max])
-            upper = center + yrange / 2
-            lower = center - yrange / 2
-        self.fig.y_range =  Range1d(lower, upper)
+        
                         
 
 def from_pickle(file):

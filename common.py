@@ -89,6 +89,9 @@ class Indicators:
     ATR_UPPER = 'ATR_UPPER'
     ATR_LOWER = 'ATR_LOWER'
     ATRP = 'ATRP'
+    ATR_H1 = 'ATR_H1'
+    ATRP_H1 = 'ATRP_H1'
+    
     DX = 'DX'
     ADX = 'ADX'
     ADX_LONG = 'ADX_LONG'
