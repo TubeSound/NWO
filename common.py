@@ -173,3 +173,4 @@ class Indicators:
     ANKO = 'ANKO'
     ANKO_ENTRY = 'ANKO_ENTRY'
     ANKO_EXIT = 'ANKO_EXIT'
+    ANKO_PROFIT = 'ANKO_PROFIT'

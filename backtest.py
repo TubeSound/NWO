@@ -21,12 +21,12 @@ JST = tz.gettz('Asia/Tokyo')
 UTC = tz.gettz('utc')
 
 from common import Indicators, Columns, Signal
-from technical import SUPERTREND, ANKO, rally, sma
+from technical import ANKO, rally, sma
 from strategy import Simulation
 from time_utils import TimeFilter, TimeUtils
 from data_loader import DataLoader
 import random
-from dashboard_market import calc_indicators, calc_atrp, expand_time
+from dashboard_market import calc_indicators, calc_atrp, expand_time, calc_profit, PARAM, DEFAULT
 
 def makeFig(rows, cols, size):
     fig, ax = plt.subplots(rows, cols, figsize=(size[0], size[1]))
@@ -144,14 +144,18 @@ def sl_range(symbol):
         sl = 0.5        
     return Simulation.SL_RANGE, [10, sl] 
                 
-def make_trade_param(sl_method, sl):
+def get_trade_param(symbol, timeframe):
+    try:
+        p = PARAM[symbol][timeframe]
+    except:
+        p = {'sl': 500}
     param =  {
                 'strategy': 'anko',
                 'begin_hour': 0,
                 'begin_minute': 0,
                 'hours': 0,
-                'sl_method': sl_method,
-                'sl_value': sl,
+                'sl_method': Simulation.SL_FIX,
+                'sl_value': [p['sl']],
                 'trail_target':0,
                 'trail_stop': 0, 
                 'volume': 0.1, 
@@ -177,6 +181,10 @@ def randomize_trade_param(symbol):
         begin = 10
         end = 100
         step = 10
+    elif symbol == 'CL':
+        begin = 0.1
+        end = 5
+        step = 0.1
 
     param =  {
                 'strategy': 'anko',
@@ -193,13 +201,18 @@ def randomize_trade_param(symbol):
     return param
 
     
-def make_technical_param():
+def get_technical_param(symbol, timeframe):
+    
+    try:
+        p = PARAM[symbol][timeframe]
+    except:
+        p = DEFAULT
     param = { 
-            'ma_long_period': 40,
-            'atr_period': 10,
-            'atr_multiply': 3.0,
-            'update_count': 5,
-            'atrp_period': 40,
+            'ma_long_period': p['ma_long_period'],
+            'atr_period': p['atr_period'],
+            'atr_multiply': p['atr_multiply'],
+            'update_count': p['update_count'],
+            'atrp_period':40,
             'profit_ma_period': 5,
             'profit_target': [50, 100, 200, 300, 400],
             'profit_drop':  [25, 50,   50, 100, 200]
@@ -211,7 +224,7 @@ def randomize_technical_param():
             'ma_long_period': rand_step(20, 80, 5),
             'atr_period': rand_step(5, 20, 5),
             'atr_multiply': rand_step(1, 4, 0.5),
-            'update_count': rand_step(0, 30, 2),
+            'update_count': rand_step(1, 30, 1),
             'atrp_period': 40,
             'profit_ma_period': 5,
             'profit_target': [50, 100, 200, 300, 400],
@@ -351,15 +364,26 @@ def plot_markers(fig, time, df):
             fig.marker(t0, p0, marker=marker, color=color, alpha=0.5, size=20)
             marker = 'x' if lc == 'true' else '*'
             fig.marker(t1, p1, marker=marker, color='gray', alpha=0.7, size=30)
+            
+def plot_entry_exit_markers(chart, profits, entries, exits):
+    for i, (en, ex) in enumerate(zip(entries, exits)):
+        v = 0 if np.isnan(profits[i]) else profits[i]
+        if en == 1:
+            color='red'
+            chart.marker(i, v, marker='o', color=color, alpha=0.5, size=10)
+        elif en == -1:
+            color = 'green'
+            chart.marker(i, v, marker='o', color=color, alpha=0.5, size=10)
+        if ex == 1:
+            chart.marker(i, v, marker='x', color='gray', alpha=0.5, size=20)            
         
 def main(symbol, timeframe, save=True, plot=True):
     days = 20
     backtest = Backtest(symbol, timeframe)
     root = f'./evaluate/{symbol}/{timeframe}'
     os.makedirs(root, exist_ok=True)
-    method, sl = sl_fix(symbol)
-    trade_param = make_trade_param(method, sl)
-    technical_param = make_technical_param()
+    trade_param = get_trade_param(symbol, timeframe)
+    technical_param = get_technical_param(symbol, timeframe)
     df = backtest.evaluate(technical_param, trade_param, root, plot=(not plot))
     data0 = backtest.data
     time = data0[Columns.JST]
@@ -510,12 +534,12 @@ def debug(symbol, timeframe, save=True, plot=True):
     tend = time[-1]
     
     t1 = tend
-    t0 = tend - timedelta(days=days)
+    t0 = datetime(2021, 5, 5).astimezone(JST)
+    t1 = datetime(2021, 5, 14).astimezone(JST)
     n, data = TimeUtils.slice(data0, Columns.JST, t0, t1)
     backtest.data = data    
-    method, sl = sl_fix(symbol)
-    trade_param = make_trade_param(method, sl)
-    technical_param = make_technical_param()
+    trade_param = get_trade_param(symbol, timeframe)
+    technical_param = get_technical_param(symbol, timeframe)
     df = backtest.evaluate(technical_param, trade_param, root)
     l = create_fig(data, df) 
     if save:
@@ -555,14 +579,16 @@ def calc_range(lo, hi, k=2):
     r3 = float(int(r2 + 0.5)) * rate
     return r3
          
-def create_fig(data, df):
+def create_fig(data, df, plot_marker=False):
     w = 1200
     time = data[Columns.JST]
     op = data[Columns.OPEN]
     hi = data[Columns.HIGH]
     lo = data[Columns.LOW]
     cl = data[Columns.CLOSE]
-    chart1 = CandleChart('', w, 400, time)
+    profits = data[Indicators.PROFITS]
+    trade_n, total_profit = calc_profit(profits)
+    chart1 = CandleChart(f'trade n: {trade_n} profit: {total_profit:.3f}', w, 350, time)
     rally = data[Indicators.RALLY]
     chart1.plot_background(rally, ['green', 'red'])
     chart1.plot_candle(op, hi, lo, cl)
@@ -571,8 +597,8 @@ def create_fig(data, df):
     chart1.line(data[Indicators.MA_LONG], color='blue', alpha=0.4, line_width=3.0, legend_label='MA Long')
     #chart1.line(data[Indicators.ATR_UPPER], color='orange', alpha=0.4, line_width=1)
     #chart1.line(data[Indicators.ATR_LOWER], color='green', alpha=0.4, line_width=1)
-    #chart1.line(data[Indicators.SUPERTREND_U], color='orange', alpha=0.4, line_width=4.0)
-    #chart1.line(data[Indicators.SUPERTREND_L], color='green', alpha=0.4, line_width=4.0)
+    chart1.line(data[Indicators.SUPERTREND_U], color='orange', alpha=0.4, line_width=4.0)
+    chart1.line(data[Indicators.SUPERTREND_L], color='green', alpha=0.4, line_width=4.0)
     #chart1.markers(data[Indicators.SQUEEZER], cl, 1, marker='o', color='red', alpha=0.5, size=10)
     chart1.set_ylim(np.min(lo), np.max(hi), calc_range(lo, hi))
     
@@ -581,17 +607,16 @@ def create_fig(data, df):
     update = data[Indicators.SUPERTREND_UPDATE]
     up_line, down_line = separate(update, 5)
     chart1.line(update, extra_axis=True, color='yellow', alpha=0.5, line_width=5.0, line_dash='dotted')
-    chart1.line(up_line, extra_axis=True, color='green', alpha=0.5, line_width=5.0, legend_label='Supertrend Count (Long)')
-    chart1.line(down_line, extra_axis=True, color='red', alpha=0.5, line_width=5.0, legend_label='Supertrend Count (Short)')
+    #chart1.line(up_line, extra_axis=True, color='green', alpha=0.5, line_width=5.0, legend_label='Supertrend Count (Long)')
+    #chart1.line(down_line, extra_axis=True, color='red', alpha=0.5, line_width=5.0, legend_label='Supertrend Count (Short)')
     chart1.hline(0.0, 'black', extra_axis=True)
     chart1.fig.legend.location = 'top_left'
-    plot_markers(chart1, time, df)
+    if plot_marker:
+        plot_markers(chart1, time, df)
     
     chart2 = TimeChart('Profit', w, 150, time)
     chart2.line(data[Indicators.PROFITS],  color='blue', alpha=0.5, line_width=3.0, legend_label='Profit')
-    chart2.line(data[Indicators.PROFITS_CLOSE],  color='red', alpha=0.5, line_width=3.0, legend_label='Profit (Close)')
-    chart2.markers(data[Indicators.PROFITS_PEAKS], data[Indicators.PROFITS], 1, marker='o', color='red', alpha=0.5, size=10)
-    chart2.hline(0.0, 'black')
+    plot_entry_exit_markers(chart2, data[Indicators.PROFITS], data[Indicators.ANKO_ENTRY], data[Indicators.ANKO_EXIT])
     chart2.fig.legend.location = 'top_left'
     chart2.fig.x_range = chart1.fig.x_range
     
@@ -600,10 +625,26 @@ def create_fig(data, df):
     chart3.hline(0.0, 'black')
     chart3.fig.legend.location = 'top_left'
     chart3.fig.x_range = chart1.fig.x_range
+    
+    chart4 = TimeChart('ATRP', None, 150, time)
+    chart4.line(data[Indicators.ATRP],  color='blue', alpha=0.5, line_width=3.0, legend_label='ATRP')
+    chart4.line(data[Indicators.ATRP_H1],  color='red', alpha=0.5, line_width=3.0, legend_label='ATRP H1')
+    chart4.hline(0.0, 'black')
+    chart4.fig.legend.location = 'top_left'
+    chart4.fig.x_range = chart1.fig.x_range
+    chart4.set_ylim(0, 0.5, 0.5)
+    chart4.hline(0.25, 'yellow', width=2.0)
+    
         
-    figs = [chart1.fig, chart2.fig, chart3.fig]
-    l = column(*figs, width=w, height=700, background='gray')
+    figs = [chart1.fig, chart2.fig, chart3.fig, chart4.fig]
+    l = column(*figs, width=w, height=800, background='gray')
     return l #chart1.fig
     
+
+    
+    
+    
 if __name__ == '__main__':
-    optimize2stage('GBPJPY', 'H1')
+    #optimize2stage('CL', 'H1')
+    #main('DOW','H1')
+    debug('NIKKEI', 'H1')

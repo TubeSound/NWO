@@ -1013,8 +1013,13 @@ def ATR_TRAIL(data: dict, atr_window: int, atr_multiply: float, peak_hold_term: 
     data[Indicators.ATR_TRAIL_SIGNAL] = signal
 
              
-def SUPERTREND(data: dict,  atr_window: int, multiply):
+def ANKO(data: dict,  atr_window: int, multiply, update_count):
     time = data[Columns.TIME]
+    op = data[Columns.OPEN]
+    hi = data[Columns.HIGH]
+    lo = data[Columns.LOW]
+    cl = data[Columns.CLOSE]
+    
     price = hl2(data)
     data[Columns.HL2] = price
     n = len(time)
@@ -1024,20 +1029,8 @@ def SUPERTREND(data: dict,  atr_window: int, multiply):
     data[Indicators.ATR_UPPER] = atr_u
     data[Indicators.ATR_LOWER] = atr_l
     data[Indicators.ATR] = atr
-    SUPERTREND_SIGNAL(data)
-    
-def SUPERTREND_SIGNAL(data: dict):
-    time = data[Columns.TIME]
-    n = len(time)
-    cl = data[Columns.CLOSE]
-    atr_u = data[Indicators.ATR_UPPER]
-    atr_l = data[Indicators.ATR_LOWER]
-    #price = sma(cl, short_term)
-    
-    price = data[Columns.HL2]
-    
+
     trend = nans(n)
-    sig = full(n, 0)
     stop_price = nans(n)
     upper = nans(n)
     lower = nans(n)
@@ -1065,9 +1058,8 @@ def SUPERTREND_SIGNAL(data: dict):
             if price[i] < lower[i]:
                  # up->down trend 
                 trend[i] = DOWN
-                sig[i] = Signal.SHORT
                 stop_price[i] = lower[i]
-                count = 0
+                count = -1
             else:
                 trend[i] = UP
         else:
@@ -1084,32 +1076,56 @@ def SUPERTREND_SIGNAL(data: dict):
             if price[i] > upper[i]:
                 # donw -> up trend
                 trend[i] = UP
-                sig[i] = Signal.LONG
                 stop_price[i] = upper[i]
-                count = 0
+                count = 1
             else:
                 trend[i] = DOWN
         update[i] = count
-    
+        
+    entries = full(n, 0)
     exits = full(n, 0)
-    ent = False
+    state = 0
     for i in range(n):
-        if sig[i] != 0:
-            if ent:
-                if sig[i] == Signal.LONG:
-                    exits[i] = Signal.SHORT
-                elif sig[i] == Signal.SHORT:
-                    exits[i] = Signal.LONG
+        if state == 0:
+            if abs(update[i]) >= update_count:
+                if update[i] > 0:
+                    entries[i] = Signal.LONG
+                    state = Signal.LONG
+                else:
+                    entries[i] = Signal.SHORT
+                    state = Signal.SHORT
+        else:
+            if update[i] == 0:
+                exits[i] = 1
+                state = 0
             else:
-                ent = True
-           
+                if state == Signal.LONG and update[i] < 0:                
+                    exits[i] = 1
+                    if update[i] <= - update_count:
+                        entries[i] = Signal.SHORT
+                        state = Signal.SHORT
+                    else: 
+                        state = 0
+                elif state == Signal.SHORT and update[i] > 0:
+                    exits[i] = 1
+                    if update[i] >= update_count:
+                        entries[i] = Signal.LONG
+                        state = Signal.LONG
+                    else:
+                        state = 0
+    profit = profits(cl, hi, lo, entries, exits)
+    
     data[Indicators.SUPERTREND_MA] = price
     data[Indicators.SUPERTREND] = trend  
-    data[Indicators.SUPERTREND_ENTRY] = sig
-    data[Indicators.SUPERTREND_EXIT]  = exits     
+
     data[Indicators.SUPERTREND_U] = upper  
     data[Indicators.SUPERTREND_L] = lower  
     data[Indicators.SUPERTREND_UPDATE] = update
+    data[Indicators.ANKO_ENTRY] = entries
+    data[Indicators.ANKO_EXIT]  = exits     
+    data[Indicators.PROFITS] = profit
+    
+    
     return 
 
 def accumulate(array):
@@ -1667,64 +1683,6 @@ def MA_FILTER(ma, price):
             out[i] = -1
     return out
     
-def ANKO(data, update_count, profit_ma_period, profit_target, profit_drop, ma_filter_on=True):
-    # -1: descend 1: ascend
-    try:
-        update = data[Indicators.SUPERTREND_UPDATE]
-        n = len(update)
-        if ma_filter_on:
-            ma = data[Indicators.MA_LONG]
-            ma_filter = MA_FILTER(ma, data[Columns.CLOSE])
-            ma_short = data[Indicators.MA_SHORT]
-            price = data[Columns.CLOSE]
-    except:
-        raise Exception("NO indicator rally, supertrend")    
-    entry = np.full(n, 0)
-    ext = np.full(n, 0) 
-    state = 0
-    for i, u in enumerate(update):
-        if state == 0:
-            trigger = 0
-            if u >=update_count:
-                if ma_filter_on:
-                    if ma_filter[i] == 1:
-                        trigger = Signal.LONG
-                else:
-                    trigger = Signal.LONG
-            elif u <= - update_count:
-                if ma_filter_on:
-                    if ma_filter[i] == -1:
-                        trigger = Signal.SHORT
-                else:
-                    trigger = Signal.SHORT
-            if trigger != 0:
-                entry[i] = trigger
-                state = trigger            
-        else:
-            if u == 0:
-                state = 0
-                ext[i] = 1
-                
-    #ext = np.full(n, 0)            
-    #for i, sig in enumerate(entry):
-    #    if sig != 0:
-    #        j = dropped(sig, ma_short, i, 7, close_drop_rate)
-    #        if j >= 0:
-    #            ext[j] = sig
-                
-    data[Indicators.ANKO_ENTRY] = entry
-    #data[Indicators.ANKO_EXIT] = ext
-    
-    prof_cl, prof =  profits(data[Columns.CLOSE], data[Columns.HIGH], data[Columns.LOW], entry, ext)
-    prof_ma = sma(prof_cl, profit_ma_period)
-    data[Indicators.PROFITS_CLOSE] = prof_cl
-    data[Indicators.PROFITS] = prof
-    data[Indicators.PROFITS_MA] = prof_ma
-    
-    peak_indices = detect_dip(prof_cl, profit_target, profit_drop)
-    peaks = indices_to_array(peak_indices, len(prof))
-    data[Indicators.ANKO_EXIT] = peaks
-    data[Indicators.PROFITS_PEAKS] = peaks
     
     
 def indices_to_array(indices, length):
@@ -1808,27 +1766,36 @@ def trailing_dip(profits, targets, drops):
 
 def profits(cl, hi, lo, entries, exits):
     n = len(cl)
-    prof_cl = np.full(n, np.nan)
     prof = np.full(n, np.nan)
     if exits is None:
         exits = np.full(n, 0)
     state = 0
     for i, (entry, ext) in enumerate(zip(entries, exits)):
         if state == 0:
-            p0 = cl[i]
-            state = entry
+            if entry != 0:
+                p0 = cl[i]
+                state = entry
         else:
             if ext != 0:
-                #prof[i] = 0
-                state = 0
-            else:
                 if state == Signal.LONG:
-                    prof_cl[i] = cl[i] - p0
-                    prof[i] = lo[i] - p0
+                    prof[i] = cl[i] - p0
                 else:
-                    prof_cl[i] = p0 - cl[i]
-                    prof[i] = p0 - hi[i]
-    return prof_cl, prof
+                    prof[i] = p0 - cl[i]
+                if entry == 0:
+                    state = 0
+                else:
+                    state = entry
+                    p0 = cl[i]
+            else:
+                if entry == 0:
+                    if state == Signal.LONG:
+                        prof[i] = cl[i] - p0
+                    else:
+                        prof[i] = p0 - cl[i]
+                else:
+                    state = entry
+                    p0 = cl[i]             
+    return prof
     
     
 

@@ -14,7 +14,7 @@ from mt5_trade import Mt5Trade, Columns, PositionInfo
 from time_utils import TimeUtils
 from data_buffer import DataBuffer
 from candle_chart import CandleChart, TimeChart
-from technical import rally, SUPERTREND, SUPERTREND_SIGNAL, SQUEEZER, ANKO, ATRP
+from technical import rally, ANKO, ATRP
 from common import Indicators
 
 JST = tz.gettz('Asia/Tokyo')
@@ -32,7 +32,7 @@ P_MA_LONG_PERIOD = [20, 30, 40, 50, 60, 80, 100]
 P_DATA_LENGTH = [300, 100, 200, 400, 500, 800, 1000, 1500, 2000, 3000, 4000]
 P_ATR_PERIOD = [5, 10, 15, 20, 25, 30, 40, 50]
 P_ATR_MULTIPLY = [1.0, 1.5, 2.0, 3.0, 3.5, 4.0]
-P_UPDATE_COUNT = [1, 2, 3, 4, 5, 7, 10, 20]
+P_UPDATE_COUNT = [0, 1, 2, 3, 4, 5, 7, 10, 20]
 
 
 LENGTH_MARGIN = 400
@@ -44,11 +44,15 @@ ATR_MULTIPLY = 'atr_multiply'
 SL = 'sl'
 
 PARAM = {
-            'NSDQ':  {'M15': {MA_LONG_PERIOD: 40, ATR_PERIOD: 15, ATR_MULTIPLY: 3.0, UPDATE_COUNT: 4, SL: 90}},
-            'NSDQ':  {'M30': {MA_LONG_PERIOD: 35, ATR_PERIOD: 10, ATR_MULTIPLY: 1.5, UPDATE_COUNT: 3, SL: 90}},
-            'NSDQ':  {'H1': {MA_LONG_PERIOD: 70, ATR_PERIOD: 20, ATR_MULTIPLY: 1.0, UPDATE_COUNT: 3, SL: 50}},
-            'XAUUSD':  {'M30': {MA_LONG_PERIOD: 65, ATR_PERIOD: 5, ATR_MULTIPLY: 3.0, UPDATE_COUNT: 3, SL: 90}},
-            'XAUUSD':  {'H1': {MA_LONG_PERIOD: 55, ATR_PERIOD: 5, ATR_MULTIPLY: 2.0, UPDATE_COUNT: 1, SL: 95}},
+            'DOW':  {'H1': {MA_LONG_PERIOD: 60, ATR_PERIOD: 10, ATR_MULTIPLY: 1.5, UPDATE_COUNT: 5, SL: 125}},
+            'NSDQ': {  
+                        'M30': {MA_LONG_PERIOD: 25, ATR_PERIOD: 10, ATR_MULTIPLY: 1.5, UPDATE_COUNT: 1, SL: 50},
+                        'M15': {MA_LONG_PERIOD: 50, ATR_PERIOD: 20, ATR_MULTIPLY: 1.5, UPDATE_COUNT: 1, SL: 20}
+                    },
+            'XAUUSD': {
+                        'H1': {MA_LONG_PERIOD: 75, ATR_PERIOD: 10, ATR_MULTIPLY: 3.5, UPDATE_COUNT: 1, SL: 80},
+                        'M30': {MA_LONG_PERIOD: 40, ATR_PERIOD: 10, ATR_MULTIPLY: 2.0, UPDATE_COUNT: 1, SL: 15}
+                    },
          }
 DEFAULT = {MA_LONG_PERIOD: 40, ATR_PERIOD: 10, ATR_MULTIPLY: 3.0, UPDATE_COUNT: 5, SL: 70}
 
@@ -57,8 +61,7 @@ DEFAULT = {MA_LONG_PERIOD: 40, ATR_PERIOD: 10, ATR_MULTIPLY: 3.0, UPDATE_COUNT: 
 def calc_indicators(data, technical_params):
     p = technical_params
     rally(data, long_term= p['ma_long_period'])
-    SUPERTREND(data, p['atr_period'], p['atr_multiply'])
-    ANKO(data, p['update_count'], p['profit_ma_period'], p['profit_target'], p['profit_drop'])
+    ANKO(data, p['atr_period'], p['atr_multiply'], p['update_count'])
     w = p['atrp_period']
     ATRP(data, w, w)
     
@@ -85,7 +88,20 @@ def expand_time(time, time1h, atr1h):
             if not np.isnan(atr[i - 1]):
                 atr[i] = atr[i - 1]                
     return atr
-           
+
+def calc_profit(profits):
+    begin = None
+    prof = []
+    for i, p in enumerate(profits):
+        if begin is None:
+            if not np.isnan(p):
+                begin = i
+        else:
+            if np.isnan(p):
+                prof.append(profits[i - 1])
+                begin = None
+    return len(prof), sum(prof)
+            
     
 class Mt5Manager:
     def __init__(self, mt5, symbol, timeframe):
@@ -164,6 +180,9 @@ class DataLoader(threading.Thread):
         self.delta_hour_from_gmt  = dt
         self.server_timezone = tz
         return dt        
+    
+
+    
 
 class Dashboard:
     def __init__(self, title):
@@ -184,8 +203,10 @@ class Dashboard:
         self.profit_ma_period = 20
         try:
             param = PARAM[self.symbol][self.timeframe]
+            info = 'Optimized'
         except:
             param = DEFAULT
+            info = 'Default'
         ma_long_period = [param[MA_LONG_PERIOD]] + P_MA_LONG_PERIOD
         atr_period = [param[ATR_PERIOD]] + P_ATR_PERIOD
         atr_multiply = [param[ATR_MULTIPLY]] + P_ATR_MULTIPLY
@@ -196,6 +217,7 @@ class Dashboard:
             self.atr_multiply = st.sidebar.selectbox("ATR Multiply", atr_multiply)   
             self.update_count = st.sidebar.selectbox("Update Count", update_count)
             self.plot_marker = st.checkbox('マーカー表示', value=False)
+            st.write(info)
         self.profit_target = [50, 100, 200, 300, 400]
         self.profit_drop   = [25, 50,   50, 100, 200]
         
@@ -223,19 +245,18 @@ class Dashboard:
         return r3
         
 
-        
-    def calc_profit(self, profits):
-        begin = None
-        prof = []
-        for i, p in enumerate(profits):
-            if begin is None:
-                if not np.isnan(p):
-                    begin = i
-            else:
-                if np.isnan(p):
-                    prof.append(profits[i - 1])
-                    begin = None
-        return len(prof), sum(prof)
+    def plot_entry_exit_markers(self, chart, profits, entries, exits):
+        for i, (en, ex) in enumerate(zip(entries, exits)):
+            v = 0 if np.isnan(profits[i]) else profits[i]
+            if en == 1:
+                color='red'
+                chart.marker(i, v, marker='o', color=color, alpha=0.5, size=10)
+            elif en == -1:
+                color = 'green'
+                chart.marker(i, v, marker='o', color=color, alpha=0.5, size=10)
+            if ex == 1:
+                chart.marker(i, v, marker='x', color='gray', alpha=0.5, size=20)   
+
         
     def create_fig(self, data, data2, plot_marker=True):
         time = data[Columns.JST]
@@ -244,7 +265,7 @@ class Dashboard:
         lo = data[Columns.LOW]
         cl = data[Columns.CLOSE]
         profits = data[Indicators.PROFITS]
-        trade_n, total_profit = self.calc_profit(profits)
+        trade_n, total_profit = calc_profit(profits)
         chart1 = CandleChart(f'{self.symbol} {self.timeframe} trade n: {trade_n} profit: {total_profit:.3f}', None, 350, time)
         try:
             rally = data[Indicators.RALLY]
@@ -264,13 +285,13 @@ class Dashboard:
         #chart1.markers(data[Indicators.SQUEEZER], cl, 1, marker='o', color='red', alpha=0.5, size=10)
         chart1.set_ylim(np.min(lo), np.max(hi), self.calc_range(lo, hi))
         
+        entries = data[Indicators.ANKO_ENTRY]
+        exits = data[Indicators.ANKO_EXIT]
         if plot_marker:
-            entry = data[Indicators.ANKO_ENTRY]
-            ext = data[Indicators.ANKO_EXIT]
-            chart1.markers(entry, cl, 1, marker='^', color='green', alpha=0.5, size=20)
-            chart1.markers(entry, cl, -1, marker='v', color='red', alpha=0.5, size=20)
-            chart1.markers(ext, cl, 1, marker='*', color='gray', alpha=0.6, size=30)
-            chart1.markers(ext, cl, -1, marker='*', color='red', alpha=0.6, size=30)
+            chart1.markers(entries, cl, 1, marker='^', color='green', alpha=0.5, size=20)
+            chart1.markers(entries, cl, -1, marker='v', color='red', alpha=0.5, size=20)
+            chart1.markers(exits, cl, 1, marker='*', color='gray', alpha=0.6, size=30)
+            chart1.markers(exits, cl, -1, marker='*', color='red', alpha=0.6, size=30)
         r = 50
         if self.timeframe == 'H1' or self.timeframe == 'M30':
             r = 100
@@ -286,7 +307,8 @@ class Dashboard:
         chart2 = TimeChart('Profit', None, 150, time)
         chart2.line(profits,  color='blue', alpha=0.5, line_width=3.0, legend_label='Profit')
         #chart2.line(data[Indicators.PROFITS_MA],  color='red', alpha=0.5, line_width=3.0, legend_label='Profit MA')
-        chart2.markers(data[Indicators.PROFITS_PEAKS], data[Indicators.PROFITS], 1, marker='o', color='red', alpha=0.5, size=10)
+        #chart2.markers(data[Indicators.PROFITS_PEAKS], data[Indicators.PROFITS], 1, marker='o', color='red', alpha=0.5, size=10)
+        self.plot_entry_exit_markers(chart2, profits, entries, exits)
         chart2.hline(0.0, 'black')
         chart2.fig.legend.location = 'top_left'
         chart2.fig.x_range = chart1.fig.x_range

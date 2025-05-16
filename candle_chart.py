@@ -61,6 +61,8 @@ class TimeChart():
         self.indices = range(len(time))
 
     def time_index(self, time):
+        if isinstance(time, int):
+             return time
         for i, d in enumerate(self.time):
             if d > time:
                 return i
