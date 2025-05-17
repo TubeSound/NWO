@@ -32,7 +32,7 @@ P_MA_LONG_PERIOD = [20, 30, 40, 50, 60, 80, 100]
 P_DATA_LENGTH = [300, 100, 200, 400, 500, 800, 1000, 1500, 2000, 3000, 4000]
 P_ATR_PERIOD = [5, 10, 15, 20, 25, 30, 40, 50]
 P_ATR_MULTIPLY = [1.0, 1.5, 2.0, 3.0, 3.5, 4.0]
-P_UPDATE_COUNT = [0, 1, 2, 3, 4, 5, 7, 10, 20]
+P_UPDATE_COUNT = [1, 2, 3, 4, 5, 7, 10, 20]
 
 
 LENGTH_MARGIN = 400
@@ -89,17 +89,14 @@ def expand_time(time, time1h, atr1h):
                 atr[i] = atr[i - 1]                
     return atr
 
-def calc_profit(profits):
+def calc_profit(profits, exits):
     begin = None
     prof = []
-    for i, p in enumerate(profits):
-        if begin is None:
-            if not np.isnan(p):
-                begin = i
-        else:
-            if np.isnan(p):
-                prof.append(profits[i - 1])
-                begin = None
+    for i, (p, ext) in enumerate(zip(profits, exits)):
+        if ext != 0:
+            prof.append(p)
+    if (not np.isnan(profits[-1])) and exits == 0:
+        prof.append(profits[-1])
     return len(prof), sum(prof)
             
     
@@ -265,7 +262,9 @@ class Dashboard:
         lo = data[Columns.LOW]
         cl = data[Columns.CLOSE]
         profits = data[Indicators.PROFITS]
-        trade_n, total_profit = calc_profit(profits)
+        entries = data[Indicators.ANKO_ENTRY]
+        exits = data[Indicators.ANKO_EXIT]
+        trade_n, total_profit = calc_profit(profits, exits)
         chart1 = CandleChart(f'{self.symbol} {self.timeframe} trade n: {trade_n} profit: {total_profit:.3f}', None, 350, time)
         try:
             rally = data[Indicators.RALLY]
@@ -285,8 +284,6 @@ class Dashboard:
         #chart1.markers(data[Indicators.SQUEEZER], cl, 1, marker='o', color='red', alpha=0.5, size=10)
         chart1.set_ylim(np.min(lo), np.max(hi), self.calc_range(lo, hi))
         
-        entries = data[Indicators.ANKO_ENTRY]
-        exits = data[Indicators.ANKO_EXIT]
         if plot_marker:
             chart1.markers(entries, cl, 1, marker='^', color='green', alpha=0.5, size=20)
             chart1.markers(entries, cl, -1, marker='v', color='red', alpha=0.5, size=20)

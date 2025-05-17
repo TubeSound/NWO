@@ -103,7 +103,7 @@ def save_data():
             save('./data/Axiory/' + symbol + '_' + tf + ".pkl", data)
     
 def main():
-    #dl1()
+    dl1()
     save_data()
     from analyze_atrp import main5
     main5()

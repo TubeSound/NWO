@@ -534,8 +534,8 @@ def debug(symbol, timeframe, save=True, plot=True):
     tend = time[-1]
     
     t1 = tend
-    t0 = datetime(2021, 5, 5).astimezone(JST)
-    t1 = datetime(2021, 5, 14).astimezone(JST)
+    t0 = datetime(2025, 4, 16).astimezone(JST)
+    t1 = datetime(2025, 5, 17).astimezone(JST)
     n, data = TimeUtils.slice(data0, Columns.JST, t0, t1)
     backtest.data = data    
     trade_param = get_trade_param(symbol, timeframe)
@@ -587,7 +587,7 @@ def create_fig(data, df, plot_marker=False):
     lo = data[Columns.LOW]
     cl = data[Columns.CLOSE]
     profits = data[Indicators.PROFITS]
-    trade_n, total_profit = calc_profit(profits)
+    trade_n, total_profit = calc_profit(profits, data[Indicators.ANKO_EXIT])
     chart1 = CandleChart(f'trade n: {trade_n} profit: {total_profit:.3f}', w, 350, time)
     rally = data[Indicators.RALLY]
     chart1.plot_background(rally, ['green', 'red'])
@@ -645,6 +645,6 @@ def create_fig(data, df, plot_marker=False):
     
     
 if __name__ == '__main__':
-    #optimize2stage('CL', 'H1')
+    optimize2stage('NIKKEI', 'M15')
     #main('DOW','H1')
-    debug('NIKKEI', 'H1')
+    #debug('NIKKEI', 'H1')
