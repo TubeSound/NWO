@@ -1,0 +1,8 @@
+pandas
+streamlit
+bokeh==2.4.3
+MetaTrader5==5.0.4874
+numpy==1.26.4
+openpyxl
+scipy
+scikit-learn
