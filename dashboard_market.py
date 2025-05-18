@@ -25,7 +25,7 @@ from streamlit_autorefresh import st_autorefresh
 # 5秒ごとにリロード
 is_first_time = True
 
-P_SYMBOLS = ['NIKKEI', 'DOW', 'NSDQ', 'SP', 'HK50', 'XAUUSD', 'USDJPY']
+P_SYMBOLS = ['NIKKEI', 'DOW', 'NSDQ', 'SP', 'HK50', 'XAUUSD', 'USDJPY', 'CL']
 P_TIMEFRAMES = ['H1', 'M5', 'M15', 'M30', 'H4', 'D1']
 P_MA_LONG_PERIOD = [20, 30, 40, 50, 60, 80, 100]
 P_DATA_LENGTH = [300, 100, 200, 400, 500, 800, 1000, 1500, 2000, 3000, 4000]
@@ -42,15 +42,24 @@ ATR_PERIOD = 'atr_period'
 ATR_MULTIPLY = 'atr_multiply'
 SL = 'sl'
 
-PARAM = {
-            'DOW':  {'H1': {MA_LONG_PERIOD: 60, ATR_PERIOD: 10, ATR_MULTIPLY: 1.5, UPDATE_COUNT: 5, SL: 125}},
+PARAM = {   'CL': {  
+                    'H1': {MA_LONG_PERIOD: 75, ATR_PERIOD: 10, ATR_MULTIPLY: 1.0, UPDATE_COUNT: 4, SL: 1},
+                    'M30': {MA_LONG_PERIOD: 25, ATR_PERIOD: 10, ATR_MULTIPLY: 2.0, UPDATE_COUNT: 4, SL: 1}
+                    },
+            'DOW':  {'M30': {MA_LONG_PERIOD: 80, ATR_PERIOD: 20, ATR_MULTIPLY: 2.5, UPDATE_COUNT: 7, SL: 250}},
+            'NIKKEI':  {'M30': {MA_LONG_PERIOD: 20, ATR_PERIOD: 20, ATR_MULTIPLY: 1.5, UPDATE_COUNT: 3, SL: 250}},
             'NSDQ': {  
-                        'M30': {MA_LONG_PERIOD: 25, ATR_PERIOD: 10, ATR_MULTIPLY: 1.5, UPDATE_COUNT: 1, SL: 50},
-                        'M15': {MA_LONG_PERIOD: 50, ATR_PERIOD: 20, ATR_MULTIPLY: 1.5, UPDATE_COUNT: 1, SL: 20}
+                        'H1': {MA_LONG_PERIOD: 75, ATR_PERIOD: 20, ATR_MULTIPLY: 1.0, UPDATE_COUNT: 4, SL: 20},
+                        'M30': {MA_LONG_PERIOD: 55, ATR_PERIOD: 15, ATR_MULTIPLY: 2.0, UPDATE_COUNT: 2, SL: 20},
+                        'M15': {MA_LONG_PERIOD: 35, ATR_PERIOD: 10, ATR_MULTIPLY: 1.5, UPDATE_COUNT: 1, SL: 20}
+                    },
+            'USDJPY': {
+                        'H1': {MA_LONG_PERIOD: 45, ATR_PERIOD: 20, ATR_MULTIPLY: 4.0, UPDATE_COUNT: 1, SL: 1},
+                        'M30': {MA_LONG_PERIOD: 70, ATR_PERIOD: 15, ATR_MULTIPLY: 2.5, UPDATE_COUNT: 2, SL: 1}
                     },
             'XAUUSD': {
-                        'H1': {MA_LONG_PERIOD: 75, ATR_PERIOD: 10, ATR_MULTIPLY: 3.5, UPDATE_COUNT: 1, SL: 80},
-                        'M30': {MA_LONG_PERIOD: 40, ATR_PERIOD: 10, ATR_MULTIPLY: 2.0, UPDATE_COUNT: 1, SL: 15}
+                        'H1': {MA_LONG_PERIOD: 55, ATR_PERIOD: 5, ATR_MULTIPLY: 2.0, UPDATE_COUNT: 2, SL: 10},
+                        'M30': {MA_LONG_PERIOD: 40, ATR_PERIOD: 5, ATR_MULTIPLY: 3.0, UPDATE_COUNT: 5, SL: 10}
                     },
          }
 DEFAULT = {MA_LONG_PERIOD: 40, ATR_PERIOD: 10, ATR_MULTIPLY: 3.0, UPDATE_COUNT: 5, SL: 70}
