@@ -185,6 +185,18 @@ def randomize_trade_param(symbol):
         begin = 0.1
         end = 5
         step = 0.1
+    elif symbol == 'HK50':
+        begin = 20
+        end = 500
+        step = 25
+    elif symbol == 'DAX':
+        begin= 25
+        end = 500
+        step = 25
+    elif symbol == 'FTSE':
+        begin = 10
+        end = 100
+        step = 10
 
     param =  {
                 'strategy': 'anko',
@@ -209,6 +221,7 @@ def get_technical_param(symbol, timeframe):
         p = DEFAULT
     param = { 
             'ma_long_period': p['ma_long_period'],
+            'ma_long_trend_th': p['ma_long_trend_th'],
             'atr_period': p['atr_period'],
             'atr_multiply': p['atr_multiply'],
             'update_count': p['update_count'],
@@ -222,6 +235,7 @@ def get_technical_param(symbol, timeframe):
 def randomize_technical_param():
     param = { 
             'ma_long_period': rand_step(20, 80, 5),
+            'ma_long_trend_th': rand_step(0.05, 0.5, 0.05),
             'atr_period': rand_step(5, 20, 5),
             'atr_multiply': rand_step(1, 4, 0.5),
             'update_count': rand_step(1, 30, 1),
@@ -311,7 +325,7 @@ class Backtest():
         return (df, summary, drawdown, profit_curve)
         
     def evaluate(self, technical_param, trade_param, dirpath, save=True, plot=True):
-        calc_indicators(self.data, technical_param)
+        calc_indicators(self.timeframe, self.data, technical_param)
         if self.data_h1 is not None:
             calc_atrp(self.data_h1, technical_param)
             atr_h1 = self.data_h1[Indicators.ATR]
@@ -369,10 +383,10 @@ def plot_entry_exit_markers(chart, profits, entries, exits):
     for i, (en, ex) in enumerate(zip(entries, exits)):
         v = 0 if np.isnan(profits[i]) else profits[i]
         if en == 1:
-            color='red'
+            color='green'
             chart.marker(i, v, marker='o', color=color, alpha=0.5, size=10)
         elif en == -1:
-            color = 'green'
+            color = 'red'
             chart.marker(i, v, marker='o', color=color, alpha=0.5, size=10)
         if ex == 1:
             chart.marker(i, v, marker='x', color='gray', alpha=0.5, size=20)            
@@ -447,7 +461,9 @@ def select_top(array, index, top):
     else:
         return sorted(array, key=lambda x: x[index], reverse=True)[:top]
         
-def optimize2stage(symbol, timeframe, repeat=1000, top=50):
+def optimize2stage(symbol, timeframe, repeat=2000, top=50):
+    print('Start ', symbol, timeframe
+          )
     dirpath = f'./optimize2stage_2025_01/sl_fix/{symbol}/{timeframe}'
     os.makedirs(dirpath, exist_ok=True)
     png_dir = os.path.join(dirpath, 'profit')
@@ -460,7 +476,7 @@ def optimize2stage(symbol, timeframe, repeat=1000, top=50):
         backtest.set_time(tbegin, None)
         trade_param = randomize_trade_param(symbol)
         technical_param = randomize_technical_param()
-        (df, summary, drawdown, profit_curve, chart_profit) = backtest.evaluate(technical_param, trade_param, dirpath, plot=False)
+        (df, summary, drawdown, profit_curve, chart_profit) = backtest.evaluate(technical_param, trade_param, dirpath, plot=False, save=False)
         trade_num, profit, win_rate = summary
         p = [i, profit, drawdown, technical_param, trade_param]
         print(i, profit, drawdown)
@@ -489,8 +505,8 @@ def optimize2stage(symbol, timeframe, repeat=1000, top=50):
             columns += c1
     df_summary = pd.DataFrame(data=data, columns=columns)
     df_best = select_best_param(df_summary)
-    df_summary.sort_values(by='profit', ascending=False)
-    df_summary.to_csv(os.path.join(dirpath, f'{symbol}_{timeframe}_trade_param.csv'), index=False)
+    df_summary = df_summary.sort_values(by='profit', ascending=False)
+    df_summary.to_csv(os.path.join(dirpath, f'{symbol}_{timeframe}.csv'), index=False)
         
         
 def select_best_param(df0):
@@ -534,7 +550,7 @@ def debug(symbol, timeframe, save=True, plot=True):
     tend = time[-1]
     
     t1 = tend
-    t0 = datetime(2025, 4, 16).astimezone(JST)
+    t0 = datetime(2025, 5, 9).astimezone(JST)
     t1 = datetime(2025, 5, 17).astimezone(JST)
     n, data = TimeUtils.slice(data0, Columns.JST, t0, t1)
     backtest.data = data    
@@ -645,6 +661,6 @@ def create_fig(data, df, plot_marker=False):
     
     
 if __name__ == '__main__':
-    optimize2stage('NIKKEI', 'M15')
-    #main('DOW','H1')
-    #debug('NIKKEI', 'H1')
+    optimize2stage('DAX', 'H1')
+    #main('CL','H1')
+    #debug('NIKKEI', 'M15')

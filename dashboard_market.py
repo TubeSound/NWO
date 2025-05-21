@@ -25,9 +25,10 @@ from streamlit_autorefresh import st_autorefresh
 # 5秒ごとにリロード
 is_first_time = True
 
-P_SYMBOLS = ['NIKKEI', 'DOW', 'NSDQ', 'SP', 'HK50', 'XAUUSD', 'USDJPY', 'CL']
+P_SYMBOLS = ['NIKKEI', 'DOW', 'NSDQ', 'SP', 'HK50', 'DAX', 'FTSE', 'XAUUSD', 'USDJPY', 'CL']
 P_TIMEFRAMES = ['H1', 'M5', 'M15', 'M30', 'H4', 'D1']
 P_MA_LONG_PERIOD = [20, 30, 40, 50, 60, 80, 100]
+P_MA_LONG_TREND_TH = [0.3, 0.1, 0.15, 0.2, 0.25, 0.3, 0.35, 0.4]
 P_DATA_LENGTH = [300, 100, 200, 400, 500, 800, 1000, 1500, 2000, 3000, 4000]
 P_ATR_PERIOD = [5, 10, 15, 20, 25, 30, 40, 50]
 P_ATR_MULTIPLY = [1.0, 1.5, 2.0, 3.0, 3.5, 4.0]
@@ -38,38 +39,63 @@ LENGTH_MARGIN = 400
 
 UPDATE_COUNT = 'update_count'
 MA_LONG_PERIOD= 'ma_long_period'
+MA_LONG_TREND_TH = 'ma_long_trend_th'
 ATR_PERIOD = 'atr_period'
 ATR_MULTIPLY = 'atr_multiply'
 SL = 'sl'
 
-PARAM = {   'CL': {  
-                    'H1': {MA_LONG_PERIOD: 75, ATR_PERIOD: 10, ATR_MULTIPLY: 1.0, UPDATE_COUNT: 4, SL: 1},
-                    'M30': {MA_LONG_PERIOD: 25, ATR_PERIOD: 10, ATR_MULTIPLY: 2.0, UPDATE_COUNT: 4, SL: 1}
+PARAM = {
+            'CL': {  
+                    'M30': {MA_LONG_PERIOD: 20, MA_LONG_TREND_TH: 0.25, ATR_PERIOD: 10, ATR_MULTIPLY: 2.0, UPDATE_COUNT: 3, SL: 1},
+                    'M15': {MA_LONG_PERIOD: 20, MA_LONG_TREND_TH: 0.1, ATR_PERIOD: 15, ATR_MULTIPLY: 3.0, UPDATE_COUNT: 8, SL: 1}
                     },
-            'DOW':  {'M30': {MA_LONG_PERIOD: 80, ATR_PERIOD: 20, ATR_MULTIPLY: 2.5, UPDATE_COUNT: 7, SL: 250}},
-            'NIKKEI':  {'M30': {MA_LONG_PERIOD: 20, ATR_PERIOD: 20, ATR_MULTIPLY: 1.5, UPDATE_COUNT: 3, SL: 250}},
+            'DOW':  {
+                    'H1': {MA_LONG_PERIOD: 45, MA_LONG_TREND_TH:0.05, ATR_PERIOD: 15, ATR_MULTIPLY: 1.5, UPDATE_COUNT: 5, SL: 250},
+                    'M30': {MA_LONG_PERIOD: 75, MA_LONG_TREND_TH:0.05, ATR_PERIOD: 20, ATR_MULTIPLY: 2.5, UPDATE_COUNT: 6, SL: 250},
+                    'M15': {MA_LONG_PERIOD: 70, MA_LONG_TREND_TH:0.05, ATR_PERIOD: 10, ATR_MULTIPLY: 2.0, UPDATE_COUNT: 5, SL: 250}
+                    },
+            'HK50': {  
+                    'H1': {MA_LONG_PERIOD: 25, MA_LONG_TREND_TH: 0.05, ATR_PERIOD: 15, ATR_MULTIPLY: 1.0, UPDATE_COUNT: 3, SL: 1},
+                    'M30': {MA_LONG_PERIOD: 80, MA_LONG_TREND_TH: 0.05, ATR_PERIOD: 5, ATR_MULTIPLY: 2.5, UPDATE_COUNT: 6, SL: 1}
+                    },
+            'NIKKEI':  {
+                    'H1': {MA_LONG_PERIOD: 50, MA_LONG_TREND_TH:0.05, ATR_PERIOD: 5, ATR_MULTIPLY: 1.5, UPDATE_COUNT: 2, SL: 250},
+                    'M30': {MA_LONG_PERIOD: 20, MA_LONG_TREND_TH:0.15, ATR_PERIOD: 5, ATR_MULTIPLY: 1.5, UPDATE_COUNT: 9, SL: 250},
+                    'M15': {MA_LONG_PERIOD: 30, MA_LONG_TREND_TH:0.3, ATR_PERIOD: 15, ATR_MULTIPLY: 2.0, UPDATE_COUNT: 10, SL: 250}
+                    },
             'NSDQ': {  
-                        'H1': {MA_LONG_PERIOD: 75, ATR_PERIOD: 20, ATR_MULTIPLY: 1.0, UPDATE_COUNT: 4, SL: 20},
-                        'M30': {MA_LONG_PERIOD: 55, ATR_PERIOD: 15, ATR_MULTIPLY: 2.0, UPDATE_COUNT: 2, SL: 20},
-                        'M15': {MA_LONG_PERIOD: 35, ATR_PERIOD: 10, ATR_MULTIPLY: 1.5, UPDATE_COUNT: 1, SL: 20}
+                        'H1': {MA_LONG_PERIOD: 20, MA_LONG_TREND_TH: 0.05, ATR_PERIOD: 20, ATR_MULTIPLY: 1.0, UPDATE_COUNT: 4, SL: 20},
+                        'M30': {MA_LONG_PERIOD: 25, MA_LONG_TREND_TH: 0.15, ATR_PERIOD: 5, ATR_MULTIPLY: 1.5, UPDATE_COUNT: 9, SL: 20},
+                        'M15': {MA_LONG_PERIOD: 55, MA_LONG_TREND_TH: 0.3, ATR_PERIOD: 10, ATR_MULTIPLY: 2.5, UPDATE_COUNT: 4, SL: 20}
+                    },
+            'DAX': {  
+                        'H1': {MA_LONG_PERIOD: 30, MA_LONG_TREND_TH: 0.05, ATR_PERIOD: 5, ATR_MULTIPLY: 1.5, UPDATE_COUNT: 5, SL: 20},
+                        'M30': {MA_LONG_PERIOD: 75, MA_LONG_TREND_TH: 0.05, ATR_PERIOD: 20, ATR_MULTIPLY: 2.5, UPDATE_COUNT: 5, SL: 20},
+                        'M15': {MA_LONG_PERIOD: 65, MA_LONG_TREND_TH: 0.1, ATR_PERIOD: 20, ATR_MULTIPLY: 4, UPDATE_COUNT: 2, SL: 20}
+                    },
+            'FTSE': {  
+                    'M30': {MA_LONG_PERIOD: 25, MA_LONG_TREND_TH: 0.2, ATR_PERIOD: 20, ATR_MULTIPLY: 2.5, UPDATE_COUNT: 13, SL: 1},
+                    'M15': {MA_LONG_PERIOD: 50, MA_LONG_TREND_TH: 0.25, ATR_PERIOD: 5, ATR_MULTIPLY: 4.0, UPDATE_COUNT: 4, SL: 1}
                     },
             'USDJPY': {
-                        'H1': {MA_LONG_PERIOD: 45, ATR_PERIOD: 20, ATR_MULTIPLY: 4.0, UPDATE_COUNT: 1, SL: 1},
-                        'M30': {MA_LONG_PERIOD: 70, ATR_PERIOD: 15, ATR_MULTIPLY: 2.5, UPDATE_COUNT: 2, SL: 1}
+                        'H1': {MA_LONG_PERIOD: 25, MA_LONG_TREND_TH: 0.05, ATR_PERIOD: 15, ATR_MULTIPLY: 3.0, UPDATE_COUNT: 2, SL: 1},
+                        'M30': {MA_LONG_PERIOD: 40, MA_LONG_TREND_TH: 0.05, ATR_PERIOD: 10, ATR_MULTIPLY: 4.0, UPDATE_COUNT: 2, SL: 1}
                     },
             'XAUUSD': {
-                        'H1': {MA_LONG_PERIOD: 55, ATR_PERIOD: 5, ATR_MULTIPLY: 2.0, UPDATE_COUNT: 2, SL: 10},
-                        'M30': {MA_LONG_PERIOD: 40, ATR_PERIOD: 5, ATR_MULTIPLY: 3.0, UPDATE_COUNT: 5, SL: 10}
+                        'H1': {MA_LONG_PERIOD: 25, MA_LONG_TREND_TH: 0.05, ATR_PERIOD: 5, ATR_MULTIPLY: 2.0, UPDATE_COUNT: 3, SL: 10},
+                        'M30': {MA_LONG_PERIOD: 65, MA_LONG_TREND_TH:0.05, ATR_PERIOD: 5, ATR_MULTIPLY: 3.5, UPDATE_COUNT: 1, SL: 10},
+                        'M15': {MA_LONG_PERIOD: 40, MA_LONG_TREND_TH:0.2, ATR_PERIOD: 10, ATR_MULTIPLY: 4.0, UPDATE_COUNT: 1, SL: 10}
                     },
          }
-DEFAULT = {MA_LONG_PERIOD: 40, ATR_PERIOD: 10, ATR_MULTIPLY: 3.0, UPDATE_COUNT: 5, SL: 70}
+DEFAULT = {MA_LONG_PERIOD: 40, MA_LONG_TREND_TH:0.01, ATR_PERIOD: 10, ATR_MULTIPLY: 3.0, UPDATE_COUNT: 5, SL: 70}
 
 
 
-def calc_indicators(data, technical_params):
+def calc_indicators(timeframe, data, technical_params):
     p = technical_params
-    rally(data, long_term= p['ma_long_period'])
-    ANKO(data, p['atr_period'], p['atr_multiply'], p['update_count'])
+    th = p['ma_long_trend_th']
+    rally(timeframe, data, long_term= p['ma_long_period'], ma_long_trend_th= th)
+    ANKO(data, p['atr_period'], p['atr_multiply'], p['update_count'], ma_trend_filter=(th > 0))
     w = p['atrp_period']
     ATRP(data, w, w)
     
@@ -213,11 +239,13 @@ class Dashboard:
             param = DEFAULT
             info = 'Default'
         ma_long_period = [param[MA_LONG_PERIOD]] + P_MA_LONG_PERIOD
+        ma_long_trend_th = [param[MA_LONG_TREND_TH]] + P_MA_LONG_TREND_TH
         atr_period = [param[ATR_PERIOD]] + P_ATR_PERIOD
         atr_multiply = [param[ATR_MULTIPLY]] + P_ATR_MULTIPLY
         update_count = [param[UPDATE_COUNT]] + P_UPDATE_COUNT
         with st.sidebar: 
             self.ma_long_period = st.sidebar.selectbox("MA Long Period", ma_long_period)
+            self.ma_long_trend_th =  st.sidebar.selectbox("MA Long Trend Threshold", ma_long_trend_th)
             self.atr_period = st.sidebar.selectbox("ATR Period", atr_period)
             self.atr_multiply = st.sidebar.selectbox("ATR Multiply", atr_multiply)   
             self.update_count = st.sidebar.selectbox("Update Count", update_count)
@@ -254,10 +282,10 @@ class Dashboard:
         for i, (en, ex) in enumerate(zip(entries, exits)):
             v = 0 if np.isnan(profits[i]) else profits[i]
             if en == 1:
-                color='red'
+                color='green'
                 chart.marker(i, v, marker='o', color=color, alpha=0.5, size=10)
             elif en == -1:
-                color = 'green'
+                color = 'red'
                 chart.marker(i, v, marker='o', color=color, alpha=0.5, size=10)
             if ex == 1:
                 chart.marker(i, v, marker='x', color='gray', alpha=0.5, size=20)   
@@ -275,7 +303,7 @@ class Dashboard:
         trade_n, total_profit = calc_profit(profits, exits)
         chart1 = CandleChart(f'{self.symbol} {self.timeframe} trade n: {trade_n} profit: {total_profit:.3f}', None, 350, time)
         try:
-            rally = data[Indicators.RALLY]
+            rally = data[Indicators.MA_LONG_TREND]
             chart1.plot_background(rally, ['green', 'red'])
         except:
             pass
@@ -304,8 +332,8 @@ class Dashboard:
         update = data[Indicators.SUPERTREND_UPDATE]
         up_line, down_line = self.separate(update, self.update_count)
         chart1.line(update, extra_axis=True, color='yellow', alpha=0.5, line_width=5.0, line_dash='dotted')
-        chart1.line(up_line, extra_axis=True, color='green', alpha=0.5, line_width=5.0, legend_label='Supertrend Count (Long)')
-        chart1.line(down_line, extra_axis=True, color='red', alpha=0.5, line_width=5.0, legend_label='Supertrend Count (Short)')
+        chart1.line(up_line, extra_axis=True, color='green', alpha=0.5, line_width=5.0, legend_label='Supertrend Up')
+        chart1.line(down_line, extra_axis=True, color='red', alpha=0.5, line_width=5.0, legend_label='Supertrend Down')
         chart1.hline(0.0, 'black', extra_axis=True)
         chart1.fig.legend.location = 'top_left'
         
@@ -318,11 +346,18 @@ class Dashboard:
         chart2.fig.legend.location = 'top_left'
         chart2.fig.x_range = chart1.fig.x_range
         
-        atr1h = expand_time(time, data2[Columns.JST], data2[Indicators.ATR])
-        chart3 = TimeChart('ATR', None, 150, time)
-        chart3.line(data[Indicators.ATR],  color='blue', alpha=0.5, line_width=3.0, legend_label='ATR')
-        chart3.line(atr1h,  color='red', alpha=0.5, line_width=3.0, legend_label='ATR H1')
-        chart3.hline(0.0, 'black')
+
+        #atr1h = expand_time(time, data2[Columns.JST], data2[Indicators.ATR])
+        #chart3 = TimeChart('ATR', None, 150, time)
+        #chart3.line(data[Indicators.ATR],  color='blue', alpha=0.5, line_width=3.0, legend_label='ATR')
+        #chart3.line(atr1h,  color='red', alpha=0.5, line_width=3.0, legend_label='ATR H1')
+        #chart3.hline(0.0, 'black')
+        #chart3.fig.legend.location = 'top_left'
+        #chart3.fig.x_range = chart1.fig.x_range
+        
+    
+        chart3 = TimeChart('MA Long Slope', None, 150, time)
+        chart3.line(data[Indicators.MA_LONG_SLOPE],  color='blue', alpha=0.5, line_width=3.0, legend_label='Slope')
         chart3.fig.legend.location = 'top_left'
         chart3.fig.x_range = chart1.fig.x_range
         
@@ -356,6 +391,7 @@ class Dashboard:
                 st.session_state.DataLoader.start()
             param = { 
                         'ma_long_period': self.ma_long_period,
+                        MA_LONG_TREND_TH: self.ma_long_trend_th,
                         'atr_period': self.atr_period,
                         'atr_multiply': self.atr_multiply,
                         'update_count': self.update_count,

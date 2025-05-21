@@ -1013,7 +1013,7 @@ def ATR_TRAIL(data: dict, atr_window: int, atr_multiply: float, peak_hold_term: 
     data[Indicators.ATR_TRAIL_SIGNAL] = signal
 
              
-def ANKO(data: dict,  atr_window: int, multiply, update_count):
+def ANKO(data: dict,  atr_window: int, multiply, update_count, ma_trend_filter=True):
     time = data[Columns.TIME]
     op = data[Columns.OPEN]
     hi = data[Columns.HIGH]
@@ -1023,12 +1023,16 @@ def ANKO(data: dict,  atr_window: int, multiply, update_count):
     price = hl2(data)
     data[Columns.HL2] = price
     n = len(time)
+    
+    ma_trend = data[Indicators.MA_LONG_TREND]
+    
     atr = calc_atr(data, atr_window)
     #ATRP(data, atr_window, atr_window)
     atr_u, atr_l = band(price, atr, multiply)
     data[Indicators.ATR_UPPER] = atr_u
     data[Indicators.ATR_LOWER] = atr_l
     data[Indicators.ATR] = atr
+
 
     trend = nans(n)
     stop_price = nans(n)
@@ -1088,12 +1092,21 @@ def ANKO(data: dict,  atr_window: int, multiply, update_count):
     for i in range(n):
         if state == 0:
             if abs(update[i]) >= update_count:
-                if update[i] > 0:
-                    entries[i] = Signal.LONG
-                    state = Signal.LONG
+                if ma_trend_filter:
+                    if update[i] > 0 and ma_trend[i] == 1:
+                        entries[i] = Signal.LONG
+                        state = Signal.LONG
+                    elif update[i] < 0 and ma_trend[i] == -1:
+                        entries[i] = Signal.SHORT
+                        state = Signal.SHORT
                 else:
-                    entries[i] = Signal.SHORT
-                    state = Signal.SHORT
+                    if update[i] > 0:
+                        entries[i] = Signal.LONG
+                        state = Signal.LONG
+                    elif update[i] < 0:
+                        entries[i] = Signal.SHORT
+                        state = Signal.SHORT
+                    
         else:
             if update[i] == 0:
                 exits[i] = 1
@@ -1101,18 +1114,27 @@ def ANKO(data: dict,  atr_window: int, multiply, update_count):
             else:
                 if state == Signal.LONG and update[i] < 0:                
                     exits[i] = 1
-                    if update[i] <= - update_count:
-                        entries[i] = Signal.SHORT
-                        state = Signal.SHORT
-                    else: 
-                        state = 0
+                    if ma_trend_filter:
+                        if update[i] <= - update_count and ma_trend[i] == -1:
+                            entries[i] = Signal.SHORT
+                            state = Signal.SHORT
+                        else: 
+                            state = 0
                 elif state == Signal.SHORT and update[i] > 0:
                     exits[i] = 1
-                    if update[i] >= update_count:
-                        entries[i] = Signal.LONG
-                        state = Signal.LONG
+                    if ma_trend_filter:
+                        if update[i] >= update_count and ma_trend[i] == 1:
+                            entries[i] = Signal.LONG
+                            state = Signal.LONG
+                        else:
+                            state = 0
                     else:
-                        state = 0
+                        if update[i] >= update_count:
+                            entries[i] = Signal.LONG
+                            state = Signal.LONG
+                        else:
+                            state = 0
+                        
     profit = profits(cl, hi, lo, entries, exits)
     
     data[Indicators.SUPERTREND_MA] = price
@@ -1615,7 +1637,7 @@ def breakout(data: dict, n_bo: int, window: int, term_max):
                 current = ent[i]    
     data[Indicators.BREAKOUT_EXIT] = ext
     
-def rally(data, short_term=12, mid_term=24, long_term=48, threshold=0.1, rate=0.7):
+def rally(timeframe, data, short_term=12, mid_term=24, long_term=48, ma_long_trend_th=0.25, threshold=0.1, rate=0.7):
     cl = data[Columns.CLOSE]
     n = len(cl)
     ma1 = sma(cl, short_term)
@@ -1648,6 +1670,36 @@ def rally(data, short_term=12, mid_term=24, long_term=48, threshold=0.1, rate=0.
     data[Indicators.MA_LONG] = ma3
     data[Indicators.RALLY] = sig 
     
+    minutes = timeframe2minutes(timeframe)
+    ma_slope = slopes(ma3, 7, minutes)
+    data[Indicators.MA_LONG_SLOPE] = ma_slope
+    
+    
+    if ma_long_trend_th == 0:
+        data[Indicators.MA_LONG_TREND] = np.full(n, np.nan)
+    else:
+        trend = np.full(n, 0)
+        for i in range(n):
+            if ma_slope[i] >= ma_long_trend_th:
+                trend[i] = 1
+            elif ma_slope[i] <= -ma_long_trend_th:
+                trend[i] = -1
+        data[Indicators.MA_LONG_TREND] = trend
+    
+    
+    
+    
+
+def timeframe2minutes(timeframe):
+    if timeframe[0].upper() == 'M':
+        return int(timeframe[1:])
+    elif timeframe[0].upper() == 'H':
+        return int(timeframe[1:]) * 60
+    elif timeframe[0].upper() == 'D':
+        return int(timeframe[1:]) * 24 * 60
+    else:
+        raise Exception('Bad timeframe')
+        
     
 def dropped(signal, array, begin, length, threshold):
     n = len(array)
