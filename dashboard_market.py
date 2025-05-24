@@ -20,7 +20,7 @@ JST = tz.gettz('Asia/Tokyo')
 UTC = tz.gettz('utc')  
 
 
-from streamlit_autorefresh import st_autorefresh
+#from streamlit_autorefresh import st_autorefresh
 
 # 5秒ごとにリロード
 is_first_time = True

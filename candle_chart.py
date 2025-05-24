@@ -16,7 +16,7 @@ from dateutil import tz
 JST = tz.gettz('Asia/Tokyo')
 UTC = tz.gettz('utc')
 
-output_notebook()
+#output_notebook()
 
 TOOLS = "pan,wheel_zoom,box_zoom,box_select,crosshair,reset,save"
 TOOLTIPS=[  ( 'date',   '@date' ),
