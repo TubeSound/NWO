@@ -26,7 +26,7 @@ UTC = tz.gettz('utc')
 from common import Indicators, Signal
 from candle_chart import CandleChart
 from utils import TimeUtils, Utils
-from technical import sma, ATRP, is_nan, SUPERTREND, SUPERTREND_SIGNAL, MA, detect_gap_cross
+from technical import sma, ATRP, is_nan, MA, detect_gap_cross
 from data_loader import from_pickle
 
 cmap = plt.get_cmap("tab10")

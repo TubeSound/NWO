@@ -212,7 +212,7 @@ class TradeBot:
     def update(self):
         self.remove_closed_positions()
         record = self.trailing()
-        df = self.mt5.get_rates(self.timeframe, 2)
+        df = self.mt5.get_rates(self.symbol, self.timeframe, 2)
         df = df.iloc[:-1, :]
         n = self.buffer.update(df)
         if n > 0:
@@ -374,21 +374,39 @@ def create_bot(symbol, timeframe, lot):
     bot.set_sever_time(3, 2, 11, 1, 3.0)
     return bot
 
-     
+ALL_ITEMS = [   ['CL', 'M30', 0.01],
+            ['DOW', 'M30', 0.01],
+            ['HK50', 'M30', 0.01],
+            ['NIKKEI', 'H1', 0.01],
+            ['NSDQ', 'H1', 0.01],
+            ['NSDQ', 'M30', 0.01],
+            ['NSDQ', 'M15', 0.01],
+            ['DAX', 'M30', 0.01],
+            ['FTSE', 'M30', 0.01],
+            ['USDJPY', 'M30', 0.01],
+            ['XAUUSD', 'H1', 0.01],
+            ['XAUUSD', 'M30', 0.1]
+        ]
+    
+ITEMS1 = [   
+                ['NIKKEI', 'H1', 0.01],
+                ['NSDQ', 'H1', 0.01],
+                ['NSDQ', 'M30', 0.01],
+                ['USDJPY', 'M30', 0.01],
+                ['XAUUSD', 'M30', 0.01]
+        ]
+         
 def test():
-    items = [
-                ['NSDQ', 'M30', 0.1],
-                ['XAUUSD', 'M30', 0.1]
-            ]
+
     bots = {}
-    for i, (symbol, timeframe, lot) in enumerate(items):
+    for i, (symbol, timeframe, lot) in enumerate(ITEMS1):
         bot = create_bot(symbol, timeframe, lot)
         if i == 0:
             Mt5Trade.connect()
         bot.run()
         bots[symbol ] = bot
     while True:
-        for i, (symbol, timeframe, lot) in enumerate(items):
+        for i, (symbol, timeframe, lot) in enumerate(ITEMS1):
             scheduler.enter(10, 1 + 1, bots[symbol].update)
             scheduler.run()
 
