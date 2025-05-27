@@ -226,10 +226,10 @@ class TradeBot:
                 positions = self.trade_manager.open_positions()
                 if len(positions) > 0:
                     self.close_positions(positions, exit_signal)
-                    self.debug_print('<Exit> position num:', len(positions))
+                    self.debug_print('<Exit> position num:', self.symbol, self.timeframe, len(positions))
                     record = True
             if entry_signal == Signal.LONG or entry_signal == Signal.SHORT:
-                self.debug_print('<Signal> ', entry_signal)
+                self.debug_print('<Signal> ', self.symbol, self.timeframe,  entry_signal)
                 self.entry(self.buffer.data, entry_signal, current_index, current_time)
             if record:
                 try:
@@ -276,6 +276,7 @@ class TradeBot:
                 self.debug_print('<Entry> signal', position_info.signal, position_info.symbol, position_info.entry_index, position_info.entry_time)
         except Exception as e:
             print(' ... Entry Error', e)
+            print(position_info)
             
     def remove_closed_positions(self):
         positions = self.mt5.get_positions()
@@ -334,6 +335,12 @@ class TradeBot:
         self.trade_manager.remove_positions(removed_tickets)
 
 
+def array_str2int(s):
+    i = s.find('[')
+    j = s.find(']')
+    v = s[i + 1: j]
+    return float(v)
+
 def load_params(symbol, timeframe, volume, position_max):
     path = f'./optimize2stage_2025_01/sl_fix/best_trade_params.csv'
     df = pd.read_csv(path)
@@ -359,7 +366,7 @@ def load_params(symbol, timeframe, volume, position_max):
             'begin_minute': 0,
             'hours': 0,
             'sl_method': Simulation.SL_FIX,
-            'sl_value': row['sl_value'][0],
+            'sl_value': array_str2int(row['sl_value']),
             'trail_target':0,
             'trail_stop': 0, 
             'volume': volume, 
@@ -370,7 +377,7 @@ def load_params(symbol, timeframe, volume, position_max):
 
 def create_bot(symbol, timeframe, lot):
     technical_param, trade_param = load_params(symbol, timeframe, lot, 1)
-    bot = TradeBot(symbol, timeframe, 1, Indicators.SUPERTREND_ENTRY, Indicators.SUPERTREND_EXIT, technical_param, trade_param)    
+    bot = TradeBot(symbol, timeframe, 1, Indicators.ANKO_ENTRY, Indicators.ANKO_EXIT, technical_param, trade_param)    
     bot.set_sever_time(3, 2, 11, 1, 3.0)
     return bot
 

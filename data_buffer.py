@@ -117,13 +117,16 @@ class DataBuffer:
                 value += d
             else:
                 try:
-                    if isinstance(value[0], int):
-                        value += [0 for _ in range(n)]
+                    if isinstance(value[0], np.int64):
+                        value += np.full(n, 0, dtype=np.int64 )
+                    elif isinstance(value[0], np.uint64):
+                        value += np.full(n, 0, np.uint64)
                     else:
-                        value += nans(n)
-                except:
+                        value += np.full(n, np.nan)
+                except Exception as e:
+                    print(e)
                     print(value)
-        self.function(self.timeframe, self.data, self.params)
+        self.indicator_function(self.timeframe, self.data, self.param)
         return n
                 
                 

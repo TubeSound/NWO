@@ -184,7 +184,7 @@ def main4():
         
     
 def main5():
-    symbols = ['NIKKEI', 'DOW', 'SP', 'FTSE', 'DAX', 'USDJPY', 'XAUUSD']
+    symbols = ['NIKKEI', 'DOW', 'SP', 'FTSE', 'DAX', 'USDJPY', 'XAUUSD', 'NSDQ']
     #symbols = ['NIKKEI']
     timeframe = 'H1'
     data = {}
@@ -217,7 +217,7 @@ def main5():
     
     
     
-def plot_atrp(dic, signals, year, symbol, timeframe, t0, t1):
+def plot_atrp(dic, signals, year, symbol, timeframe, t0, t1, threshold=0.45):
     fig, axes = makeFig(2, 1, (20, 12))
     i = 0
     for symb, data in dic.items():
@@ -237,7 +237,7 @@ def plot_atrp(dic, signals, year, symbol, timeframe, t0, t1):
             axes[0].plot(jst, data['MA_LONG'], label='MA', color='purple')
             
         axes[1].plot(jst, atrp, color=cmap(i), label=symb, alpha=0.95)
-        axes[1].hlines(0.5, jst[0], jst[-1], color='yellow', linewidth=2.0)
+        axes[1].hlines(threshold, jst[0], jst[-1], color='yellow', linewidth=2.0)
         #axes[2].plot(jst, data[Indicators.FILTER_MA], color='red')
         i += 1
         
