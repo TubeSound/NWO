@@ -106,6 +106,13 @@ class DataBuffer:
         time = self.data[Columns.TIME]
         return len(time) - 1
     
+    def to__int32(self, array):
+        n = len(array)
+        out = np.full(n, np.int32)
+        for i in range(n):
+            out[i] = np.int32(array[i])
+        return out    
+    
     def update(self, df: pd.DataFrame):
         last = self.last_time()
         n, dic = df2dic(df, Columns.TIME, COLUMNS, last, self.delta_hour_from_gmt)
@@ -121,6 +128,8 @@ class DataBuffer:
                         value += np.full(n, 0, dtype=np.int64 )
                     elif isinstance(value[0], np.uint64):
                         value += np.full(n, 0, np.uint64)
+                    elif isinstance(value[0], np.int32) and isinstance(d[0], np.float):
+                        value += self.to_int32(d)
                     else:
                         value += np.full(n, np.nan)
                 except Exception as e:
