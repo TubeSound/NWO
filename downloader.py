@@ -30,9 +30,9 @@ def download(symbols, save_holder):
     api = Mt5Api()
     api.connect()
     for symbol in symbols:
-        for tf in [TimeFrame.M5, TimeFrame.M15, TimeFrame.M30, TimeFrame.H1, TimeFrame.H4, TimeFrame.D1, TimeFrame.M1]:
-            for year in range(2025, 2026):
-                for month in range(5, 6):
+        for tf in [TimeFrame.M15, TimeFrame.M30, TimeFrame.H1, TimeFrame.H4, TimeFrame.D1, TimeFrame.M1]:
+            for year in range(2020, 2026):
+                for month in range(1, 13):
                     t0 = datetime(year, month, 1, 0)
                     t0 = t0.replace(tzinfo=JST)
                     t1 = t0 + relativedelta(months=1) - timedelta(seconds=1)
@@ -94,7 +94,7 @@ def save_data():
     loader = DataLoader()
     for symbol in all_symbols():
         if symbol in ['TSLA', 'NVDA', 'NIKKEI', 'NSDQ', 'XAUUSD']:
-            tfs = ['M1', 'M5', 'M15', 'M30', 'H1', 'H4', 'D1']
+            tfs = ['M15', 'M30', 'H1', 'H4', 'D1']
         else:
             tfs = ['M15' , 'M30', 'H1', 'H4', 'D1']
         for tf in tfs:

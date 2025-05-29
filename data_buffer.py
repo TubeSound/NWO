@@ -106,12 +106,27 @@ class DataBuffer:
         time = self.data[Columns.TIME]
         return len(time) - 1
     
-    def to__int32(self, array):
+    def to_int32(self, array):
         n = len(array)
-        out = np.full(n, np.int32)
+        out = []
         for i in range(n):
-            out[i] = np.int32(array[i])
+            out.append(np.int32(array[i]))
+        return out  
+    
+    def to_int64(self, array):
+        n = len(array)
+        out = []
+        for i in range(n):
+            out.append(np.int64(array[i]))
+        return out  
+
+    def to_float64(self, array):
+        n = len(array)
+        out = []
+        for i in range(n):
+            out.append(np.float64(array[i]))
         return out    
+    
     
     def update(self, df: pd.DataFrame):
         last = self.last_time()
@@ -121,19 +136,25 @@ class DataBuffer:
         for key, value in self.data.items():
             if key in dic.keys():
                 d = dic[key]
+                if isinstance(value[0],  np.int64):
+                    d = self.to_int64(d)
+                elif isinstance(value[0], np.int32):
+                    d = self.to_int32(d)
+                elif isinstance(value[0], np.float64):
+                    d = self.to_float64(d)
                 value += d
             else:
                 try:
                     if isinstance(value[0], np.int64):
                         value += np.full(n, 0, dtype=np.int64 )
                     elif isinstance(value[0], np.uint64):
-                        value += np.full(n, 0, np.uint64)
-                    elif isinstance(value[0], np.int32) and isinstance(d[0], np.float):
-                        value += self.to_int32(d)
+                        value += np.full(n, 0, dtype=np.uint64)
+                    elif isinstance(value[0], np.int32):
+                        value += np.full(n, 0, dtype=np.int32)
                     else:
                         value += np.full(n, np.nan)
                 except Exception as e:
-                    print(e)
+                    print('update()', e)
                     print(value)
         self.indicator_function(self.timeframe, self.data, self.param)
         return n
