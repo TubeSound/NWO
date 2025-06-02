@@ -24,6 +24,9 @@ def from_pickle(symbol, timeframe, source='Axiory'):
     return data0
 
 class DataLoader:
+    def __init__(self, dealer):
+        self.dealer = dealer
+        
     def server_time_str_2_datetime(self, server_time_str_list, server_timezone, format='%Y-%m-%d %H:%M:%S'):
         t_utc = []
         t_jst = []
@@ -49,7 +52,7 @@ class DataLoader:
         return out
     
     def data_filepath(self, symbol, timeframe, year, month):
-        path = '../MarketData/Axiory/'
+        path = f'../MarketData/{self.dealer}/'
         dir_path = os.path.join(path, symbol, timeframe)
         name = symbol + '_' + timeframe + '_' + str(year) + '_' + str(month).zfill(2) + '.csv'
         filepath = os.path.join(dir_path, name)

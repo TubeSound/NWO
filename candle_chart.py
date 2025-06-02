@@ -38,8 +38,10 @@ class TimeChart():
         else:
             self.fig = figure(  x_axis_type="linear",
                     tools=TOOLS, 
-                    plot_width=width,
-                    plot_height=height,
+                    outer_width=width,
+                    outer_height=height,
+                    #plot_width=width,
+                    #plot_height=height,
                     y_axis_label=ylabel,
                     title = title)
         self.width = width

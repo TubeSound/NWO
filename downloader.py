@@ -19,6 +19,8 @@ from data_loader import DataLoader
 JST = tz.gettz('Asia/Tokyo')
 UTC = tz.gettz('utc') 
 
+AXIORY = 'axiory'
+FXGT = 'fxgt'
 
 def all_symbols():
     symbols = ['NIKKEI', 'DOW', 'NSDQ', 'SP', 'HK50', 'DAX', 'FTSE', 'XAUUSD']
@@ -30,7 +32,11 @@ def download(symbols, save_holder):
     api = Mt5Api()
     api.connect()
     for symbol in symbols:
+<<<<<<< HEAD
+        for tf in [TimeFrame.M5, TimeFrame.M15, TimeFrame.M30, TimeFrame.H1, TimeFrame.H4, TimeFrame.D1, TimeFrame.M1]:
+=======
         for tf in [TimeFrame.M15, TimeFrame.M30, TimeFrame.H1, TimeFrame.H4, TimeFrame.D1, TimeFrame.M1]:
+>>>>>>> 7dee66868b4daa2e5a9c66e42be42a838775db16
             for year in range(2020, 2026):
                 for month in range(1, 13):
                     t0 = datetime(year, month, 1, 0)
@@ -72,9 +78,12 @@ def download_tick(symbols, save_holder):
     pass
 
 
-def dl1():
-    symbols = all_symbols()
-    download(symbols, '../MarketData/Axiory/')
+def dl1(dealer):
+    if dealer == AXIORY:
+        symbols = all_symbols()
+    else:
+        symbols = ['BTCUSDs']
+    download(symbols, f'../MarketData/{dealer}/')
     
 def dl2():
     symbols = ['SP', 'HK50', 'DAX', 'FTSE',  'XAGUSD', 'EURJPY', 'AUDJPY']
@@ -86,27 +95,27 @@ def save(filepath, obj):
     with open(filepath, mode='wb') as f:
         pickle.dump(obj, f)
     
-def save_data():
+def save_data(dealer, symbols):
     year_from = 2020
     month_from = 1
     year_to = 2025
     month_to = 5
-    loader = DataLoader()
-    for symbol in all_symbols():
+    loader = DataLoader(dealer)
+    for symbol in symbols:
         if symbol in ['TSLA', 'NVDA', 'NIKKEI', 'NSDQ', 'XAUUSD']:
             tfs = ['M15', 'M30', 'H1', 'H4', 'D1']
         else:
-            tfs = ['M15' , 'M30', 'H1', 'H4', 'D1']
+            tfs = ['M5', 'M15' , 'M30', 'H1', 'H4', 'D1']
         for tf in tfs:
             n, data = loader.load_data(symbol, tf, year_from, month_from, year_to, month_to)
-            os.makedirs('./data/Axiory', exist_ok=True)
-            save('./data/Axiory/' + symbol + '_' + tf + ".pkl", data)
+            os.makedirs(f'./data/{dealer}', exist_ok=True)
+            save(f'./data/{dealer}/' + symbol + '_' + tf + ".pkl", data)
     
 def main():
-    dl1()
-    save_data()
+    #dl1(FXGT)
+    save_data(FXGT, ['BTCUSDs'])
     from analyze_atrp import main5
-    main5()
+    #main5()
     #download_tick(['DOW', 'NIKKEI', 'NSDQ', 'XAUUSD'], './data/Axiory/tick')
     
     

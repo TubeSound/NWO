@@ -11,7 +11,7 @@ from bokeh.layouts import column, row, layout, gridplot
 from bokeh.io import export_png
 from bokeh.plotting import show
 from bokeh.plotting import output_notebook
-output_notebook() 
+#output_notebook() 
 
 
 import pandas as pd
@@ -27,6 +27,9 @@ from time_utils import TimeFilter, TimeUtils
 from data_loader import DataLoader
 import random
 from dashboard_market import calc_indicators, calc_atrp, expand_time, calc_profit, PARAM, DEFAULT
+
+AXIORY = 'axiory'
+FXGT = 'fxgt'
 
 def makeFig(rows, cols, size):
     fig, ax = plt.subplots(rows, cols, figsize=(size[0], size[1]))
@@ -197,6 +200,10 @@ def randomize_trade_param(symbol):
         begin = 10
         end = 100
         step = 10
+    elif symbol == 'BTCUSDs':
+        begin = 100
+        end = 1500
+        step = 100
 
     param =  {
                 'strategy': 'anko',
@@ -250,18 +257,19 @@ def randomize_technical_param():
               
 class Backtest():
     
-    def __init__(self, symbol, timeframe):
+    def __init__(self, dealer, symbol, timeframe):
+        self.dealer = dealer
         self.symbol = symbol
         self.timeframe = timeframe
-        self.data = self.from_pickle(symbol, timeframe)
+        self.data = self.from_pickle(dealer, symbol, timeframe)
         if timeframe != 'H1':
-            self.data_h1 = self.from_pickle(symbol, 'H1')
+            self.data_h1 = self.from_pickle(dealer, symbol, 'H1')
         else:
             self.data_h1 = None
         self.jst = self.data[Columns.JST]
                 
-    def from_pickle(self, symbol, timeframe):
-        filepath = './data/Axiory/' + symbol + '_' + timeframe + '.pkl'
+    def from_pickle(self, dealer, symbol, timeframe):
+        filepath = f'./data/{dealer}/' + symbol + '_' + timeframe + '.pkl'
         with open(filepath, 'rb') as f:
             data0 = pickle.load(f)
         return data0                
@@ -461,7 +469,7 @@ def select_top(array, index, top):
     else:
         return sorted(array, key=lambda x: x[index], reverse=True)[:top]
         
-def optimize2stage(symbol, timeframe, repeat=2000, top=50):
+def optimize2stage(dealer, symbol, timeframe, repeat=2000, top=50):
     print('Start ', symbol, timeframe
           )
     dirpath = f'./optimize2stage_2025_01/sl_fix/{symbol}/{timeframe}'
@@ -472,7 +480,7 @@ def optimize2stage(symbol, timeframe, repeat=2000, top=50):
     columns = None
     result = []
     for i in range(repeat):
-        backtest = Backtest(symbol, timeframe)
+        backtest = Backtest(dealer, symbol, timeframe)
         backtest.set_time(tbegin, None)
         trade_param = randomize_trade_param(symbol)
         technical_param = randomize_technical_param()
@@ -487,7 +495,7 @@ def optimize2stage(symbol, timeframe, repeat=2000, top=50):
     data = []
     columns = None
     for i, (_,  profit, drawdown, technical_param, trade_param) in enumerate(selected):
-        backtest = Backtest(symbol, timeframe)
+        backtest = Backtest(dealer, symbol, timeframe)
         (df, summary, drawdown, profit_curve, chart_profit) = backtest.evaluate(technical_param, trade_param, dirpath, plot=False)
         trade_num, profit, win_rate = summary
         if profit > 0:
@@ -661,6 +669,6 @@ def create_fig(data, df, plot_marker=False):
     
     
 if __name__ == '__main__':
-    optimize2stage('DAX', 'H1')
+    optimize2stage(FXGT, 'BTCUSDs', 'M5')
     #main('CL','H1')
     #debug('NIKKEI', 'M15')
