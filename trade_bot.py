@@ -342,7 +342,7 @@ def array_str2int(s):
     return float(v)
 
 def load_params(symbol, timeframe, volume, position_max):
-    path = f'./optimize2stage_2025_01/sl_fix/best_trade_params.csv'
+    path = f'./optimize2stage_2025_01_v2/sl_fix/best_trade_params.csv'
     df = pd.read_csv(path)
     df = df[df['symbol'] == symbol]
     df = df[df['timeframe'] == timeframe]
