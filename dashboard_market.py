@@ -60,7 +60,7 @@ PARAM = {
                     },
             'NIKKEI':  {
                     'H1': {MA_LONG_PERIOD: 50, MA_LONG_TREND_TH:0.05, ATR_PERIOD: 5, ATR_MULTIPLY: 1.5, UPDATE_COUNT: 2, SL: 250},
-                    'M30': {MA_LONG_PERIOD: 20, MA_LONG_TREND_TH:0.15, ATR_PERIOD: 5, ATR_MULTIPLY: 1.5, UPDATE_COUNT: 9, SL: 250},
+                    'M30': {MA_LONG_PERIOD: 40, MA_LONG_TREND_TH:0.2, ATR_PERIOD: 20, ATR_MULTIPLY: 2.0, UPDATE_COUNT: 18, SL: 250},
                     'M15': {MA_LONG_PERIOD: 30, MA_LONG_TREND_TH:0.3, ATR_PERIOD: 15, ATR_MULTIPLY: 2.0, UPDATE_COUNT: 10, SL: 250}
                     },
             'NSDQ': {  

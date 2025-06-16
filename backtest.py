@@ -170,36 +170,36 @@ def get_trade_param(symbol, timeframe):
 def randomize_trade_param(symbol):
     if symbol == 'NIKKEI' or symbol == 'DOW':
         begin = 50
-        end = 500
-        step = 25
+        end = 250
+        step = 50
     elif symbol == 'XAUUSD':
         begin = 5
-        end = 100
+        end = 50
         step = 5
     elif symbol == 'USDJPY' or symbol == 'GBPJPY':
-        begin = 0.2
-        end = 2.0
-        step = 0.2
+        begin = 0.1
+        end = 1.0
+        step = 0.1
     elif symbol == 'NSDQ':
-        begin = 10
-        end = 100
-        step = 10
+        begin = 20
+        end = 160
+        step = 20
     elif symbol == 'CL':
         begin = 0.1
-        end = 5
+        end = 2
         step = 0.1
     elif symbol == 'HK50':
         begin = 20
-        end = 500
-        step = 25
+        end = 160
+        step = 20
     elif symbol == 'DAX':
-        begin= 25
-        end = 500
-        step = 25
+        begin= 20
+        end = 200
+        step = 20
     elif symbol == 'FTSE':
-        begin = 10
+        begin = 20
         end = 100
-        step = 10
+        step = 20
     elif symbol == 'BTCUSDs':
         begin = 100
         end = 1500
@@ -242,7 +242,7 @@ def get_technical_param(symbol, timeframe):
 def randomize_technical_param():
     param = { 
             'ma_long_period': rand_step(20, 80, 5),
-            'ma_long_trend_th': rand_step(0.05, 0.5, 0.05),
+            'ma_long_trend_th': rand_step(0.2, 5, 0.1),
             'atr_period': rand_step(5, 20, 5),
             'atr_multiply': rand_step(1, 4, 0.5),
             'update_count': rand_step(1, 30, 1),
@@ -472,7 +472,7 @@ def select_top(array, index, top):
 def optimize2stage(dealer, symbol, timeframe, repeat=2000, top=50):
     print('Start ', symbol, timeframe
           )
-    dirpath = f'./optimize2stage_2025_01/sl_fix/{symbol}/{timeframe}'
+    dirpath = f'./optimize2stage_2025_01_v2/sl_fix/{symbol}/{timeframe}'
     os.makedirs(dirpath, exist_ok=True)
     png_dir = os.path.join(dirpath, 'profit')
     os.makedirs(png_dir, exist_ok=True)
@@ -669,6 +669,6 @@ def create_fig(data, df, plot_marker=False):
     
     
 if __name__ == '__main__':
-    optimize2stage(FXGT, 'BTCUSDs', 'M5')
+    optimize2stage(AXIORY, 'NIKKEI', 'M30')
     #main('CL','H1')
     #debug('NIKKEI', 'M15')

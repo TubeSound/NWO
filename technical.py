@@ -57,6 +57,21 @@ def ema(vector, window):
         out[i] = np.sum(d * weights)
     return out
 
+def linear_regression(x, y):
+    n = len(x)
+    sum_x = sum(x)
+    sum_y = sum(y)
+    sum_xy = sum(xi * yi for xi, yi in zip(x, y))
+    sum_x2 = sum(xi * xi for xi in x)
+
+    denominator = n * sum_x2 - sum_x * sum_x
+    if denominator == 0:
+        raise ValueError("ゼロ除算になるので回帰できません")
+
+    a = (n * sum_xy - sum_x * sum_y) / denominator  # 傾き
+    b = (sum_y * sum_x2 - sum_x * sum_xy) / denominator  # 切片
+    return a, b
+
 def slopes(signal: list, window: int, minutes: int, tolerance=0.0):
     n = len(signal)
     out = full(n, np.nan)
@@ -64,9 +79,12 @@ def slopes(signal: list, window: int, minutes: int, tolerance=0.0):
         d = signal[i - window + 1: i + 1]
         if np.min(d) == 0:
             continue        
-        m, offset = np.polyfit(range(window), d, 1)
+        if i == n -1:
+            pass
+        m, offset = linear_regression(range(window), d)
         if abs(m) > tolerance:
-            out[i] = m / np.mean(d[:3]) * 100.0 / (window * minutes)  * 60 * 24
+            #out[i] = m / np.mean(d[:3]) * 100.0 / (window * minutes)  * 60 * 24
+            out[i] = m / np.mean(d[-1]) * 100.0 / minutes  * 60 * 24
     return out
 
 

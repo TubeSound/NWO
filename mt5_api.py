@@ -3,6 +3,7 @@ import MetaTrader5 as mt5
 import os
 import time
 import pandas as pd
+import numpy as np
 from dateutil import tz
 from datetime import datetime, timedelta, timezone
 from time_utils import TimeUtils
@@ -105,13 +106,15 @@ class Mt5Api:
         print('Data size',  len(df))
         # 秒での時間をdatetime形式に変換する
         t0 = pd.to_datetime(df['time'], unit='s')
-        tmsec = [t % 1000 for t in df['time_msc']]
+        
+        time_msec = df['time_msc'].to_list()
+        tmsec = np.array(time_msec) % 1000
         
         utc, jst = adjust(t0)
         
         
-        utc = [t + timedelta(milliseconds=msec) for t, msec in zip(utc, tmsec)]
-        jst = [t + timedelta(milliseconds=msec) for t, msec in zip(jst, tmsec)]
+        utc = [t + timedelta(milliseconds=int(msec)) for t, msec in zip(utc, tmsec)]
+        jst = [t + timedelta(milliseconds=int(msec)) for t, msec in zip(jst, tmsec)]
         
         
         df['jst'] = jst
@@ -159,9 +162,9 @@ def test1():
     os.makedirs(dirpath, exist_ok=True)
     
     mt5api = Mt5Api()
-    tfrom = datetime(2025, 1, 25, 1, 34).astimezone(JST)
+    tfrom = datetime(2025, 7, 1).astimezone(JST)
     for i in range(10):
-        df = mt5api.get_ticks_from(symbol, tfrom, 1000000)
+        df = mt5api.get_ticks_from(symbol, tfrom, 200000)
         df.to_csv(f'{dirpath}/{i}.csv', index=False)
         time.sleep(1)
 
