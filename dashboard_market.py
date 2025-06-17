@@ -1,6 +1,7 @@
 import time
 import threading
 import numpy as np
+import pandas as pd
 from dateutil import tz
 from datetime import datetime, timedelta
 import threading
@@ -15,6 +16,7 @@ from data_buffer import DataBuffer
 from candle_chart import CandleChart, TimeChart
 from technical import rally, ANKO, ATRP
 from common import Indicators
+from strategy import Simulation
 
 JST = tz.gettz('Asia/Tokyo')
 UTC = tz.gettz('utc')  
@@ -90,6 +92,46 @@ PARAM = {
 DEFAULT = {MA_LONG_PERIOD: 40, MA_LONG_TREND_TH:0.01, ATR_PERIOD: 10, ATR_MULTIPLY: 3.0, UPDATE_COUNT: 5, SL: 70}
 
 
+
+def load_params(symbol, timeframe, volume, position_max):
+    def array_str2int(s):
+        i = s.find('[')
+        j = s.find(']')
+        v = s[i + 1: j]
+        return float(v)
+    
+    path = f'./optimize2stage_2025_01_v2/sl_fix/best_trade_params.csv'
+
+    df = pd.read_csv(path)
+    df = df[df['symbol'] == symbol]
+    df = df[df['timeframe'] == timeframe]
+    row = df.iloc[0]
+    
+    
+    param1 = { 
+            'ma_long_period': row['ma_long_period'],
+            'ma_long_trend_th': row['ma_long_trend_th'],
+            'atr_period': row['atr_period'],
+            'atr_multiply': row['atr_multiply'],
+            'update_count': row['update_count'],
+            'atrp_period':40,
+            'profit_ma_period': 5,
+            'profit_target': [50, 100, 200, 300, 400],
+            'profit_drop':  [25, 50,   50, 100, 200]
+            }
+    param2 =  {
+            'strategy': 'anko',
+            'begin_hour': 0,
+            'begin_minute': 0,
+            'hours': 0,
+            'sl_method': Simulation.SL_FIX,
+            'sl_value': array_str2int(row['sl_value']),
+            'trail_target':0,
+            'trail_stop': 0, 
+            'volume': volume, 
+            'position_max': position_max, 
+            'timelimit': 0}
+    return param1, param2
 
 def calc_indicators(timeframe, data, technical_params):
     p = technical_params
@@ -233,7 +275,7 @@ class Dashboard:
         self.length = st.sidebar.selectbox('Length', P_DATA_LENGTH)
         self.profit_ma_period = 20
         try:
-            param = PARAM[self.symbol][self.timeframe]
+            param, _ = load_params(self.symbol, self.timeframe, 0.1, 2)
             info = 'Optimized'
         except:
             param = DEFAULT

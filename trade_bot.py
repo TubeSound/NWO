@@ -335,13 +335,13 @@ class TradeBot:
         self.trade_manager.remove_positions(removed_tickets)
 
 
-def array_str2int(s):
-    i = s.find('[')
-    j = s.find(']')
-    v = s[i + 1: j]
-    return float(v)
-
 def load_params(symbol, timeframe, volume, position_max):
+    def array_str2int(s):
+        i = s.find('[')
+        j = s.find(']')
+        v = s[i + 1: j]
+        return float(v)
+    
     path = f'./optimize2stage_2025_01_v2/sl_fix/best_trade_params.csv'
     df = pd.read_csv(path)
     df = df[df['symbol'] == symbol]
