@@ -32,13 +32,9 @@ def download(symbols, save_holder):
     api = Mt5Api()
     api.connect()
     for symbol in symbols:
-<<<<<<< HEAD
         for tf in [TimeFrame.M5, TimeFrame.M15, TimeFrame.M30, TimeFrame.H1, TimeFrame.H4, TimeFrame.D1, TimeFrame.M1]:
-=======
-        for tf in [TimeFrame.M15, TimeFrame.M30, TimeFrame.H1, TimeFrame.H4, TimeFrame.D1, TimeFrame.M1]:
->>>>>>> 7dee66868b4daa2e5a9c66e42be42a838775db16
-            for year in range(2020, 2026):
-                for month in range(1, 13):
+            for year in range(2025, 2026):
+                for month in range(5, 7):
                     t0 = datetime(year, month, 1, 0)
                     t0 = t0.replace(tzinfo=JST)
                     t1 = t0 + relativedelta(months=1) - timedelta(seconds=1)
@@ -62,19 +58,19 @@ def download_tick(symbols, save_holder):
     api.connect()
     for symbol in symbols:
         year = 2024
-        month = 12
+        month = 7
+        day = 1
         tf = 'TICK'
-        t0 = datetime(year, month, 1, 0)
-        t0 = t0.replace(tzinfo=JST)
-        t1 = datetime.now(JST)
+        t0 = datetime(2024, 7, 1).replace(tzinfo=JST)
+        t1 = datetime(2025, 5, 31).replace(tzinfo=JST)
         df = api.get_ticks(symbol, t0, t1)
-        path = save_holder
+        path = os.path.join(save_holder, symbol, 'Tick')
         os.makedirs(path, exist_ok=True)
-        path = os.path.join(path, symbol + '_' + tf + '_' + str(year) + '_' + str(month).zfill(2) + '.pkl')
-        #print(path, symbol, len(df))
-        save(path, df)
+        path = os.path.join(path, f"{symbol}_{tf}_2024_07-2025_05.csv")
+        df = df[['jst', 'bid', 'ask', 'volume', 'volume_real', 'flags']]
+        df.to_csv(path, index=False)
         print(path, symbol, tf, year, '-', month, 'size: ', len(df))
-    
+
     pass
 
 
@@ -99,7 +95,7 @@ def save_data(dealer, symbols):
     year_from = 2020
     month_from = 1
     year_to = 2025
-    month_to = 5
+    month_to = 6
     loader = DataLoader(dealer)
     for symbol in symbols:
         if symbol in ['TSLA', 'NVDA', 'NIKKEI', 'NSDQ', 'XAUUSD']:
@@ -112,11 +108,16 @@ def save_data(dealer, symbols):
             save(f'./data/{dealer}/' + symbol + '_' + tf + ".pkl", data)
     
 def main():
-    #dl1(FXGT)
-    save_data(FXGT, ['BTCUSDs'])
+    #dl1(AXIORY)
+    save_data(AXIORY, all_symbols())
     from analyze_atrp import main5
-    #main5()
+    main5()
     #download_tick(['DOW', 'NIKKEI', 'NSDQ', 'XAUUSD'], './data/Axiory/tick')
+ 
+def main2():
+    symbols = ['DOW']   
+    root = '../MarketData/Axiory'
+    download_tick(symbols, root)
     
     
 if __name__ == '__main__':

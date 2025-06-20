@@ -27,7 +27,7 @@ UTC = tz.gettz('utc')
 # 5秒ごとにリロード
 is_first_time = True
 
-P_SYMBOLS = ['NIKKEI', 'DOW', 'NSDQ', 'SP', 'HK50', 'DAX', 'FTSE', 'XAUUSD', 'USDJPY', 'CL']
+P_SYMBOLS = ['NIKKEI', 'DOW', 'NSDQ', 'SP', 'HK50', 'DAX', 'HK50', 'XAGUSD', 'XAUUSD', 'USDJPY', 'CL']
 P_TIMEFRAMES = ['H1', 'M5', 'M15', 'M30', 'H4', 'D1']
 P_MA_LONG_PERIOD = [20, 30, 40, 50, 60, 80, 100]
 P_MA_LONG_TREND_TH = [0.3, 0.1, 0.15, 0.2, 0.25, 0.3, 0.35, 0.4]

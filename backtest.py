@@ -176,25 +176,37 @@ def randomize_trade_param(symbol):
         begin = 5
         end = 50
         step = 5
+    elif symbol == 'XAGUSD':
+        begin = 0.05
+        end = 1
+        step = 0.05
+    elif symbol == 'XPTUSD':
+        begin = 2.5
+        end = 25
+        step = 2.5
+    elif symbol == "NGAS":
+        begin = 0.005
+        end = 0.1
+        step = .005
     elif symbol == 'USDJPY' or symbol == 'GBPJPY':
         begin = 0.1
         end = 1.0
         step = 0.1
     elif symbol == 'NSDQ':
         begin = 20
-        end = 160
-        step = 20
+        end = 150
+        step = 10
     elif symbol == 'CL':
         begin = 0.1
         end = 2
         step = 0.1
     elif symbol == 'HK50':
         begin = 20
-        end = 160
-        step = 20
+        end = 150
+        step = 10
     elif symbol == 'DAX':
         begin= 20
-        end = 200
+        end = 150
         step = 20
     elif symbol == 'FTSE':
         begin = 20
@@ -204,6 +216,10 @@ def randomize_trade_param(symbol):
         begin = 100
         end = 1500
         step = 100
+    elif symbol == 'SP':
+        begin = 10
+        end = 100
+        step = 10
 
     param =  {
                 'strategy': 'anko',
@@ -669,6 +685,6 @@ def create_fig(data, df, plot_marker=False):
     
     
 if __name__ == '__main__':
-    optimize2stage(AXIORY, 'NIKKEI', 'M30')
+    optimize2stage(AXIORY, 'HK50', 'M30')
     #main('CL','H1')
     #debug('NIKKEI', 'M15')
