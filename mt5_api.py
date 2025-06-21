@@ -153,8 +153,26 @@ class Mt5Api:
         dic['close'] = df['close'].to_list()
         dic['volume'] = df['tick_volume'].to_list()        
         return dic
+    
+    def deal_history(self, jst_from, jst_to):
+        type2str = {0: 'buy', 1: 'sell', 2: 'balance'}
+        entry2str = {0: '', 1: 'close'}
         
-
+        utc_from = jst_from.astimezone(tz=UTC)
+        t_from = utc_to_server_time(utc_from)
+        utc_to = jst_to.astimezone(tz=UTC)
+        t_to = utc_to_server_time(utc_to)
+        deals = mt5.history_deals_get(t_from, t_to)
+        if deals is None:
+            return None
+        
+        data = []
+        for deal in deals:
+            t = pd.to_datetime(deal.time, unit='s')
+            utc, jst = adjust([t])
+            data.append([t, jst[0], deal.position_id, deal.symbol, type2str[deal.type], entry2str[deal.entry], deal.reason, deal.volume, deal.price, deal.profit])
+        df = pd.DataFrame(data=data, columns = ['time', 'jst', 'id', 'symbol', 'type', 'close', 'reason', 'volume', 'price', 'profit'])
+        return df
 
 def test1():
     symbol = 'NSDQ'
@@ -170,6 +188,14 @@ def test1():
 
     pass
 
+def test2():
+    mt5api = Mt5Api()
+    tfrom = datetime(2025, 4, 1).astimezone(JST)
+    tto = datetime(2025, 6, 22).astimezone(JST)
+    df = mt5api.deal_history(tfrom, tto)
+    os.makedirs('./debug', exist_ok=True)
+    df.to_csv('./debug/history.csv', index=False)
+
 
 if __name__ == '__main__':
-    test1()
+    test2()
