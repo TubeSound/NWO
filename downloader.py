@@ -34,7 +34,7 @@ def download(symbols, save_holder):
     for symbol in symbols:
         for tf in [TimeFrame.M5, TimeFrame.M15, TimeFrame.M30, TimeFrame.H1, TimeFrame.H4, TimeFrame.D1, TimeFrame.M1]:
             for year in range(2025, 2026):
-                for month in range(5, 7):
+                for month in range(5, 8):
                     t0 = datetime(year, month, 1, 0)
                     t0 = t0.replace(tzinfo=JST)
                     t1 = t0 + relativedelta(months=1) - timedelta(seconds=1)
@@ -53,20 +53,28 @@ def download(symbols, save_holder):
     pass
 
 
-def download_tick(symbols, save_holder):
+def download_tick(symbols, year, month, h, save_holder):
     api = Mt5Api()
     api.connect()
     for symbol in symbols:
-        year = 2024
-        month = 7
-        day = 1
         tf = 'TICK'
-        t0 = datetime(2024, 7, 1).replace(tzinfo=JST)
-        t1 = datetime(2025, 5, 31).replace(tzinfo=JST)
+        day = 7 * int(h - 1) + 1
+            
+        t0 = datetime(year, month, day).replace(tzinfo=JST)
+        if h == 4:
+            if month == 12:
+                y = year + 1
+                m = 1
+            else:
+                y = year
+                m = month + 1
+            t1 = datetime(y, m, 1).replace(tzinfo=JST)
+        else:
+            t1 = t0 + timedelta(days=7)
         df = api.get_ticks(symbol, t0, t1)
         path = os.path.join(save_holder, symbol, 'Tick')
         os.makedirs(path, exist_ok=True)
-        path = os.path.join(path, f"{symbol}_{tf}_2024_07-2025_05.csv")
+        path = os.path.join(path, f"{symbol}_{tf}_{year}-{str(month).zfill(2)}-{h}.csv")
         df = df[['jst', 'bid', 'ask', 'volume', 'volume_real', 'flags']]
         df.to_csv(path, index=False)
         print(path, symbol, tf, year, '-', month, 'size: ', len(df))
@@ -95,30 +103,28 @@ def save_data(dealer, symbols):
     year_from = 2020
     month_from = 1
     year_to = 2025
-    month_to = 6
+    month_to = 7
     loader = DataLoader(dealer)
+    tfs = ['M15', 'M30', 'H1', 'H4', 'D1']
     for symbol in symbols:
-        if symbol in ['TSLA', 'NVDA', 'NIKKEI', 'NSDQ', 'XAUUSD']:
-            tfs = ['M15', 'M30', 'H1', 'H4', 'D1']
-        else:
-            tfs = ['M5', 'M15' , 'M30', 'H1', 'H4', 'D1']
         for tf in tfs:
             n, data = loader.load_data(symbol, tf, year_from, month_from, year_to, month_to)
             os.makedirs(f'./data/{dealer}', exist_ok=True)
             save(f'./data/{dealer}/' + symbol + '_' + tf + ".pkl", data)
     
 def main():
-    #dl1(AXIORY)
+    dl1(AXIORY)
     save_data(AXIORY, all_symbols())
     from analyze_atrp import main5
     main5()
     #download_tick(['DOW', 'NIKKEI', 'NSDQ', 'XAUUSD'], './data/Axiory/tick')
  
 def main2():
-    symbols = ['DOW']   
+    symbols = ['NSDQ', 'XAUUSD', 'NIKKEI', 'CL', 'DOW']   
     root = '../MarketData/Axiory'
-    download_tick(symbols, root)
-    
-    
+    year = 2025
+    month = 7
+    for i in range(1, 2):
+        download_tick(symbols, year, month, i, root)
 if __name__ == '__main__':
     main()

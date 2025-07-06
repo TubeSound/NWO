@@ -38,10 +38,10 @@ class TimeChart():
         else:
             self.fig = figure(  x_axis_type="linear",
                     tools=TOOLS, 
-                    outer_width=width,
-                    outer_height=height,
-                    #plot_width=width,
-                    #plot_height=height,
+                    #outer_width=width,
+                    #outer_height=height,
+                    plot_width=width,
+                    plot_height=height,
                     y_axis_label=ylabel,
                     title = title)
         self.width = width
@@ -230,10 +230,28 @@ def test():
     hi = np.array(data[Columns.HIGH])
     lo = np.array(data[Columns.LOW])
     cl = np.array(data[Columns.CLOSE])
-    chart = CandleChart(symbol, 1200, 500, jst, op, hi, lo, cl)
-    export_png(chart.fig, filename='debug.png')
+    chart = CandleChart(symbol, 1200, 500, jst)
+    chart.plot_candle(op, hi, lo, cl)
+    export_png(chart.fig, filename='./debug/cancle_chart.png')
     
-    
+def test1():
+    from common import Columns
+    from time_utils import TimeUtils
+    symbol = 'NIKKEI_M30'
+    data0 = from_pickle(f'{symbol}.pkl')
+    jst0 = data0[Columns.JST]
+    t1 = jst0[-1]
+    t0 = t1 - timedelta(days=2)
+    n, data = TimeUtils.slice(data0, Columns.JST, t0, t1)
+    jst = np.array(data[Columns.JST])
+    op = np.array(data[Columns.OPEN])
+    hi = np.array(data[Columns.HIGH])
+    lo = np.array(data[Columns.LOW])
+    cl = np.array(data[Columns.CLOSE])
+    chart = TimeChart(symbol, 1200, 500, jst)
+    chart.line(cl)
+    export_png(chart.fig, filename='./debug/line_chart.png')
+        
 def test2():
     x = [0, 1, 2]
     y1 = [0, 1, 2]
@@ -265,4 +283,4 @@ def test2():
 
 
 if __name__ == '__main__':
-    test2()
+    test1()

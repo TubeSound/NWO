@@ -68,9 +68,9 @@ def linear_regression(x, y):
     if denominator == 0:
         raise ValueError("ゼロ除算になるので回帰できません")
 
-    a = (n * sum_xy - sum_x * sum_y) / denominator  # 傾き
-    b = (sum_y * sum_x2 - sum_x * sum_xy) / denominator  # 切片
-    return a, b
+    slope = (n * sum_xy - sum_x * sum_y) / denominator  # 傾き
+    offset = (sum_y * sum_x2 - sum_x * sum_xy) / denominator  # 切片
+    return slope, offset
 
 def slopes(signal: list, window: int, minutes: int, tolerance=0.0):
     n = len(signal)

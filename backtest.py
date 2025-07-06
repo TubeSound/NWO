@@ -169,45 +169,37 @@ def get_trade_param(symbol, timeframe):
 
 def randomize_trade_param(symbol):
     if symbol == 'NIKKEI' or symbol == 'DOW':
-        begin = 50
-        end = 250
-        step = 50
+        begin = 10
+        end = 150
+        step = 10
     elif symbol == 'XAUUSD':
-        begin = 5
-        end = 50
-        step = 5
+        begin = 1
+        end = 15
+        step = 1
     elif symbol == 'XAGUSD':
-        begin = 0.05
-        end = 1
-        step = 0.05
+        begin = 0.1
+        end = 1.5
+        step = 0.1
     elif symbol == 'XPTUSD':
-        begin = 2.5
-        end = 25
-        step = 2.5
+        begin = 0.25
+        end = 5.0
+        step = 0.25
     elif symbol == "NGAS":
+        begin = 0.025
+        end = 0.5
+        step = .025
+    elif symbol == 'USDJPY' or symbol == 'GBPJPY':
+        begin = 0.01
+        end = 0.2
+        step = 0.01
+    elif symbol == 'NSDQ' or symbol == 'HK50' or symbol=='DAX':
+        begin = 10
+        end = 80
+        step = 5
+    elif symbol == 'CL':
         begin = 0.005
         end = 0.1
-        step = .005
-    elif symbol == 'USDJPY' or symbol == 'GBPJPY':
-        begin = 0.1
-        end = 1.0
-        step = 0.1
-    elif symbol == 'NSDQ':
-        begin = 20
-        end = 150
-        step = 10
-    elif symbol == 'CL':
-        begin = 0.1
-        end = 2
-        step = 0.1
-    elif symbol == 'HK50':
-        begin = 20
-        end = 150
-        step = 10
-    elif symbol == 'DAX':
-        begin= 20
-        end = 150
-        step = 20
+        step = 0.005
     elif symbol == 'FTSE':
         begin = 20
         end = 100
@@ -488,7 +480,7 @@ def select_top(array, index, top):
 def optimize2stage(dealer, symbol, timeframe, repeat=2000, top=50):
     print('Start ', symbol, timeframe
           )
-    dirpath = f'./optimize2stage_2025_01_v2/sl_fix/{symbol}/{timeframe}'
+    dirpath = f'./optimize2stage_2025_01_v3/sl_fix/{symbol}/{timeframe}'
     os.makedirs(dirpath, exist_ok=True)
     png_dir = os.path.join(dirpath, 'profit')
     os.makedirs(png_dir, exist_ok=True)
@@ -685,6 +677,7 @@ def create_fig(data, df, plot_marker=False):
     
     
 if __name__ == '__main__':
-    optimize2stage(AXIORY, 'HK50', 'M30')
+    optimize2stage(AXIORY, 'SP', 'M30')
     #main('CL','H1')
+    
     #debug('NIKKEI', 'M15')
